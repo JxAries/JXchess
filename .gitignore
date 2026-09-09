@@ -1,0 +1,40 @@
+# ---- 本地提示词与个人文件，不提交 GitHub ----
+ignore/
+
+# ---- npm 本地缓存（沙箱内安装时使用）----
+.npm-cache/
+
+# ---- Node / 前端工程 ----
+node_modules/
+dist/
+build/
+*.local
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- 环境与密钥 ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.suo
+*.user
+.DS_Store
+Thumbs.db
+
+# ---- 部署产物 ----
+.coverage
+htmlcov/

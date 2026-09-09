@@ -1,0 +1,20 @@
+{
+  "name": "jxchess",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "JXchess v0.1 复盘棋盘：PGN 导入、逐步回放、摆盘研究",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

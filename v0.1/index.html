@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<!-- 首页：logo 居中放大，标题在下，入口按钮分列两侧环绕；背景是淡化的棋子缓缓飘落的小动效。 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JXchess</title>
+  <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body class="page home">
+  <!-- 飘落的棋子背景，纯装饰 -->
+  <div class="sky" aria-hidden="true">
+    <img src="./pieces/wK.svg" alt="" style="left:8%;animation-duration:26s" />
+    <img src="./pieces/bQ.svg" alt="" style="left:18%;animation-duration:34s;animation-delay:-9s" />
+    <img src="./pieces/wR.svg" alt="" style="left:30%;animation-duration:22s;animation-delay:-4s" />
+    <img src="./pieces/bN.svg" alt="" style="left:43%;animation-duration:38s;animation-delay:-18s" />
+    <img src="./pieces/wB.svg" alt="" style="left:56%;animation-duration:25s;animation-delay:-12s" />
+    <img src="./pieces/bK.svg" alt="" style="left:68%;animation-duration:30s;animation-delay:-6s" />
+    <img src="./pieces/wQ.svg" alt="" style="left:80%;animation-duration:21s;animation-delay:-3s" />
+    <img src="./pieces/bP.svg" alt="" style="left:90%;animation-duration:36s;animation-delay:-14s" />
+  </div>
+
+  <main class="home-stage">
+    <a class="entry flank left" href="./review.html">
+      <img src="./pieces/wK.svg" alt="" />
+      <span class="entry-name">复盘</span>
+      <span class="entry-desc">导入棋谱，逐步回放</span>
+    </a>
+
+    <div class="home-center">
+      <div class="home-logo"><img src="./logo.svg" alt="JXchess logo" /></div>
+      <h1 class="home-title">JXchess</h1>
+      <p class="home-sub">国际象棋复盘与摆盘工具</p>
+    </div>
+
+    <a class="entry flank right" href="./editor.html">
+      <img src="./pieces/wB.svg" alt="" />
+      <span class="entry-name">摆盘</span>
+      <span class="entry-desc">自由摆放，研究局面</span>
+    </a>
+  </main>
+
+  <script>
+    /* 提示：直接双击打开本文件时工程无法运行，需先通过 npm run dev 启动本地服务。 */
+    if (location.protocol === 'file:') {
+      var tip = document.createElement('div');
+      tip.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#8a4b2f;color:#fff;padding:10px 18px;text-align:center;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;';
+      tip.textContent = '直接双击 HTML 无法运行本工程。请在 v0.1 目录执行 npm install 后运行 npm run dev，再用浏览器访问 http://localhost:5173/';
+      document.body.appendChild(tip);
+    }
+  </script>
+</body>
+</html>
