@@ -26,12 +26,6 @@ npm run build      # 类型检查并构建，产物输出到 v0.1/dist
 npm run preview    # 在本地预览构建产物
 ```
 
-## 目录结构
-
-- `v0.1/`：Web 前端工程，按 v0.1 里程碑独立管理。`node_modules/`、`dist/` 等本地产物不提交。
-- `ignore/`：本地提示词等个人文件，不参与提交。
-- `设计文档.md`：项目设计文档，先讲为什么、再讲怎么做。
-
 ## 素材与许可
 
 - 棋子图标：使用 lichess 项目 lila 中的 gioco 棋子样式，作者 sadsnake1，许可为 CC BY-NC-SA 4.0，需署名、非商业、相同方式共享。来源：https://github.com/lichess-org/lila 的 public/piece/gioco。

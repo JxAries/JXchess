@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 复盘页：棋盘居页面正中，右侧记谱面板；导入导出按钮在记谱区顶部，播放控制条贴棋盘下方。 -->
+<!-- 复盘页：棋盘居中，右侧棋谱面板；导入导出按钮在面板顶部，播放控制条贴棋盘下方。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -16,7 +16,7 @@
     <nav class="page-nav">
       <a class="nav-link" href="./index.html">首页</a>
       <a class="nav-link active" href="./review.html">复盘</a>
-      <a class="nav-link" href="./editor.html">摆盘</a>
+      <a class="nav-link" href="./editor.html">摆棋</a>
     </nav>
     <div class="spacer"></div>
   </header>
@@ -34,19 +34,17 @@
 
     <aside class="side">
       <div class="panel movepanel">
-        <div class="panel-head">记谱</div>
+        <div class="panel-head">棋谱</div>
         <div class="panel-tools">
           <input id="file-picker" type="file" accept=".pgn,.txt,application/x-chess-pgn" hidden />
-          <button id="btn-open-file" class="mini" type="button" title="从本机选择 PGN 文件">打开文件</button>
-          <button id="btn-import" class="mini" type="button" title="粘贴 PGN 文本">粘贴棋谱</button>
-          <button id="btn-export" class="mini" type="button" title="导出当前对局为 PGN 文件">导出 PGN</button>
-          <button id="btn-flip" class="mini" type="button" title="翻转棋盘">翻转</button>
-          <button id="btn-sound" class="mini" type="button" title="音效开关">音效:开</button>
+          <button id="btn-open-file" class="btn" type="button" title="从本机选择 PGN 文件">打开文件</button>
+          <button id="btn-import" class="btn" type="button" title="粘贴 PGN 文本">粘贴棋谱</button>
+          <button id="btn-export" class="btn" type="button" title="导出当前对局为 PGN 文件">导出 PGN</button>
+          <button id="btn-flip" class="btn" type="button" title="翻转棋盘">翻转棋盘</button>
         </div>
         <div class="cap-row" id="cap-white" title="白方得子"></div>
         <div class="cap-row" id="cap-black" title="黑方得子"></div>
         <div class="move-list" id="move-list"></div>
-        <div class="result-line" id="result-line"></div>
       </div>
     </aside>
   </main>

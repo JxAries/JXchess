@@ -1,5 +1,5 @@
 /**
- * 摆盘编辑器：维护自由摆放的局面数据并负责棋盘渲染与基本编辑操作。
+ * 摆棋编辑器：维护自由摆放的局面数据并负责棋盘渲染与基本编辑操作。
  * 只处理“哪个格子放哪个棋子”，页面负责选择/擦除/放置等交互策略。
  * 重要函数：apply、movePiece、getAt、loadFen、boardPlacement、missingKings、setFlipped。
  */
@@ -31,6 +31,14 @@ export class BoardEditor {
   /** 绑定棋盘点击；页面把当前工具与选择逻辑在此接入 */
   bindPick(handler: (sq: SquareName) => void): void {
     this.board.onPick = handler;
+  }
+
+  /** 绑定棋盘拖拽（移动棋子）；canStart 可选额外限制（如仅在“选择”模式启用） */
+  bindDrag(handler: (from: SquareName, to: SquareName) => void, canStart?: () => boolean): void {
+    this.board.setDragHandlers({
+      canStart: (sq) => (canStart ? canStart() : true) && Boolean(this.getAt(sq)),
+      onDrop: handler,
+    });
   }
 
   /** 执行放置或擦除 */

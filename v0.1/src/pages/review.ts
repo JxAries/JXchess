@@ -1,6 +1,7 @@
 /**
- * 复盘页入口：装配棋盘、走棋交互、记谱面板、吃子栏与底部播放控制。
- * 支持 ?fen= 以指定局面开局；负责将军高亮、走子动画、音效、棋盘翻转与 PGN 导入导出。
+ * 复盘页入口：装配棋盘、走棋交互、棋谱面板与底部播放控制。
+ * 支持 ?fen= 指定局面开局；含将军红格、走子动画与木质音效、棋盘翻转、
+ * 变例记录与跳转、PGN 导入导出。终局时在主线的最后一步下方显示标准结果。
  */
 import '../style.css';
 import { BoardView } from '../board/boardView';
@@ -19,7 +20,7 @@ function must<T extends HTMLElement>(id: string): T {
 
 const state = new ReviewState();
 
-// 支持从摆盘页带着局面跳转过来
+// 支持从摆棋页带着局面跳转过来
 const fenParam = new URLSearchParams(location.search).get('fen');
 if (fenParam) {
   const error = state.setStartFen(fenParam);
@@ -30,7 +31,6 @@ const boardWrap = must('board-wrap');
 const moveListEl = must('move-list');
 const capWhiteEl = must('cap-white');
 const capBlackEl = must('cap-black');
-const resultLine = must('result-line');
 const filePicker = must<HTMLInputElement>('file-picker');
 
 const board = new BoardView(boardWrap);
@@ -47,8 +47,8 @@ function toast(message: string): void {
 
 function renderCaptured(): void {
   const { byWhite, byBlack } = state.captured();
-  renderCapRow(capWhiteEl, '白得子', byWhite, 'b');
-  renderCapRow(capBlackEl, '黑得子', byBlack, 'w');
+  renderCapRow(capWhiteEl, '白方得子', byWhite, 'b');
+  renderCapRow(capBlackEl, '黑方得子', byBlack, 'w');
 }
 
 function renderCapRow(el: HTMLElement, label: string, kinds: PieceKind[], color: 'w' | 'b'): void {
@@ -65,46 +65,53 @@ function renderCapRow(el: HTMLElement, label: string, kinds: PieceKind[], color:
   }
 }
 
-/** 终局时在记谱面板底部显示结果，其余时间留空 */
+/** 终局时在主线的最后一步正下方写出标准结果行 */
 function renderResult(): void {
-  const text = state.statusText();
-  const show = text.includes('胜') || text.includes('和') || text === '逼和';
-  resultLine.textContent = show ? text : '';
+  const existed = document.querySelector('#move-list .mv-result');
+  existed?.remove();
+  const status = state.statusText();
+  let text = '';
+  if (status === '白方胜') text = '1-0 · 白棋获胜';
+  else if (status === '黑方胜') text = '0-1 · 黑棋获胜';
+  else if (status.includes('和')) text = '½-½ · 平局';
+  if (!text) return;
+  const div = document.createElement('div');
+  div.className = 'mv-result';
+  div.textContent = text;
+  moveListEl.appendChild(div);
 }
 
-/** 整体刷新；move 非空时播放音效并播放该步的滑动动画 */
-function refresh(move: MovePlayed | null): void {
+/** 整体刷新；play 非空时播放音效与滑动动画 */
+function refresh(play: MovePlayed | null): void {
   const chess = state.chessNow();
 
   board.render(chess);
+  board.clearChecks();
   board.clearMarks();
 
   const last = state.lastMoveInfo();
   board.markLastMove(last ? last.from : null, last ? last.to : null);
+  if (chess.inCheck()) board.markCheck(state.kingSquare(chess.turn()));
 
-  if (chess.inCheck()) {
-    board.markCheck(state.kingSquare(chess.turn()));
-  }
-  if (move) {
-    if (sfx.enabled) {
-      if (move.capture) sfx.capture();
-      else sfx.move();
-      if (chess.inCheck()) sfx.check();
-    }
-    board.animateMove(move.from, move.to);
+  if (play) {
+    if (play.capture) sfx.capture();
+    else sfx.move();
+    if (chess.inCheck()) sfx.check();
+    board.animateMove(play.from, play.to);
   }
 
-  renderMoveList(moveListEl, state, (index) => {
-    state.goTo(index);
-    refresh(null);
+  renderMoveList(moveListEl, state, {
+    goToDepth: (depth) => {
+      state.goMainDepth(depth);
+      refresh(null);
+    },
+    goVariation: (row, index) => {
+      state.goVariation(row, index);
+      refresh(null);
+    },
   });
   renderCaptured();
   renderResult();
-  syncSoundButton();
-}
-
-function syncSoundButton(): void {
-  must('btn-sound').textContent = `音效:${sfx.enabled ? '开' : '关'}`;
 }
 
 function loadPgnText(text: string): void {
@@ -125,10 +132,10 @@ function downloadPgn(): void {
   URL.revokeObjectURL(url);
 }
 
-// 棋盘交互：成功走子后带该步信息刷新
+// 棋盘交互：点击与拖拽均在此触发刷新
 new BoardInput(board, state, { onChanged: (move) => refresh(move), onMessage: toast });
 
-// 底部播放控制
+// 底部播放控制：主线外的新变例只通过点击棋谱面板进入
 must('btn-start').addEventListener('click', () => {
   state.toStart();
   refresh(null);
@@ -138,7 +145,7 @@ must('btn-prev').addEventListener('click', () => {
   refresh(null);
 });
 must('btn-next').addEventListener('click', () => {
-  if (state.atEnd) return;
+  if (!state.canNext()) return;
   state.stepNext();
   refresh(state.lastMoveInfo());
 });
@@ -147,7 +154,7 @@ must('btn-end').addEventListener('click', () => {
   refresh(null);
 });
 
-// 记谱面板：导入导出
+// 棋谱面板：导入导出
 must('btn-open-file').addEventListener('click', () => filePicker.click());
 filePicker.addEventListener('change', () => {
   const file = filePicker.files?.[0];
@@ -168,16 +175,11 @@ must('btn-import').addEventListener('click', async () => {
 });
 must('btn-export').addEventListener('click', downloadPgn);
 
-// 翻转棋盘与音效开关
+// 翻转棋盘
 must('btn-flip').addEventListener('click', () => {
   flipped = !flipped;
   board.setFlipped(flipped);
   refresh(null);
 });
-must('btn-sound').addEventListener('click', () => {
-  sfx.toggle();
-  syncSoundButton();
-});
 
-// 首次显示
 refresh(null);

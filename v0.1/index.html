@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 首页：logo 居中放大，标题在下，入口按钮分列两侧环绕；背景是淡化的棋子缓缓飘落的小动效。 -->
+<!-- 首页：logo 居中放大，标题在下，入口按钮分列两侧环绕；背景是淡化的棋子以不同角度缓缓飘落的小动效。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -9,16 +9,16 @@
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body class="page home">
-  <!-- 飘落的棋子背景，纯装饰 -->
+  <!-- 飘落的棋子背景，纯装饰，各自带不同倾角 -->
   <div class="sky" aria-hidden="true">
-    <img src="./pieces/wK.svg" alt="" style="left:8%;animation-duration:26s" />
-    <img src="./pieces/bQ.svg" alt="" style="left:18%;animation-duration:34s;animation-delay:-9s" />
-    <img src="./pieces/wR.svg" alt="" style="left:30%;animation-duration:22s;animation-delay:-4s" />
-    <img src="./pieces/bN.svg" alt="" style="left:43%;animation-duration:38s;animation-delay:-18s" />
-    <img src="./pieces/wB.svg" alt="" style="left:56%;animation-duration:25s;animation-delay:-12s" />
-    <img src="./pieces/bK.svg" alt="" style="left:68%;animation-duration:30s;animation-delay:-6s" />
-    <img src="./pieces/wQ.svg" alt="" style="left:80%;animation-duration:21s;animation-delay:-3s" />
-    <img src="./pieces/bP.svg" alt="" style="left:90%;animation-duration:36s;animation-delay:-14s" />
+    <img src="./pieces/wK.svg" alt="" style="left:8%;animation-duration:26s;--ang:8deg" />
+    <img src="./pieces/bQ.svg" alt="" style="left:18%;animation-duration:34s;animation-delay:-9s;--ang:-10deg" />
+    <img src="./pieces/wR.svg" alt="" style="left:30%;animation-duration:22s;animation-delay:-4s;--ang:14deg" />
+    <img src="./pieces/bN.svg" alt="" style="left:43%;animation-duration:38s;animation-delay:-18s;--ang:-6deg" />
+    <img src="./pieces/wB.svg" alt="" style="left:56%;animation-duration:25s;animation-delay:-12s;--ang:20deg" />
+    <img src="./pieces/bK.svg" alt="" style="left:68%;animation-duration:30s;animation-delay:-6s;--ang:-14deg" />
+    <img src="./pieces/wQ.svg" alt="" style="left:80%;animation-duration:21s;animation-delay:-3s;--ang:26deg" />
+    <img src="./pieces/bP.svg" alt="" style="left:90%;animation-duration:36s;animation-delay:-14s;--ang:-20deg" />
   </div>
 
   <main class="home-stage">
@@ -31,12 +31,12 @@
     <div class="home-center">
       <div class="home-logo"><img src="./logo.svg" alt="JXchess logo" /></div>
       <h1 class="home-title">JXchess</h1>
-      <p class="home-sub">国际象棋复盘与摆盘工具</p>
+      <p class="home-sub">开源免费的国际象棋工具</p>
     </div>
 
     <a class="entry flank right" href="./editor.html">
       <img src="./pieces/wB.svg" alt="" />
-      <span class="entry-name">摆盘</span>
+      <span class="entry-name">摆棋</span>
       <span class="entry-desc">自由摆放，研究局面</span>
     </a>
   </main>

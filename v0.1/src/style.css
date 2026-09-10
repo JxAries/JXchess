@@ -64,25 +64,15 @@ body {
   font-family: inherit;
   cursor: pointer;
 }
-.btn:hover { background: var(--accent-soft); }
+.btn:hover:not(:disabled) { background: var(--accent-soft); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.mode { flex: 1; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { filter: brightness(1.06); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
+.btn.primary:disabled { background: #a9a298; border-color: #a9a298; color: #f2efe9; }
 .btn.block { width: 100%; padding: 10px 12px; font-size: 14px; }
 .btn.opt-chip { padding: 5px 8px; font-size: 12px; }
-
-.mini {
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--ink-2);
-  padding: 4px 9px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-}
-.mini:hover { background: var(--accent-soft); color: var(--ink); }
 
 /* ---------- 主区：棋盘居中，右侧面板 ---------- */
 .main { position: relative; flex: 1; min-height: 0; }
@@ -141,13 +131,13 @@ body {
 .sq.target::after {
   content: "";
   position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(45, 100, 150, 0.4) 0 20%, transparent 32%);
+  background: radial-gradient(circle at 50% 50%, rgba(45, 100, 150, 0.28) 0 12%, transparent 24%);
   pointer-events: none;
 }
 .sq.target-capture::after {
   content: "";
-  position: absolute; inset: 6%;
-  border: 3px solid rgba(45, 100, 150, 0.5);
+  position: absolute; inset: 8%;
+  border: 2px solid rgba(45, 100, 150, 0.35);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -232,7 +222,7 @@ body {
 }
 .cap-row img:first-of-type { margin-left: 0; }
 
-/* 记谱列表 */
+/* 棋谱列表 */
 .movepanel { flex: 1; }
 .movepanel .move-list { flex: 1; min-height: 80px; }
 .move-list { overflow-y: auto; padding: 6px 8px; }
@@ -255,12 +245,40 @@ body {
 .moves button.san.cur { background: var(--accent); color: #fff; }
 .moves .san.empty { flex: 1; }
 
-.result-line {
-  padding: 5px 12px;
+/* 变例行：被替代步下方的一条浅色小字，超宽时横向滚动不换行 */
+.moves li.var-row {
+  display: block;
+  padding: 1px 0 3px 32px;
+}
+button.var-line {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+  border: 0;
+  background: var(--accent-soft);
+  color: var(--ink-2);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 2px 8px 2px 4px;
+  margin-top: 2px;
+  cursor: pointer;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+button.var-line::-webkit-scrollbar { display: none; }
+button.var-line .var-tag { flex-shrink: 0; margin-right: 6px; color: var(--accent); }
+button.var-line .var-text { flex-shrink: 0; }
+button.var-line:hover { background: var(--line); }
+button.var-line.active { outline: 1px solid var(--accent); color: var(--ink); }
+
+/* 终局结果行，紧跟最后一步下方 */
+.mv-result {
+  padding: 6px 10px;
   font-size: 13px;
+  font-weight: 600;
   color: #8a4b2f;
-  border-top: 1px solid var(--line);
-  min-height: 22px;
 }
 
 /* ---------- 弹窗与提示 ---------- */
@@ -328,7 +346,7 @@ body {
   max-width: 80vw;
 }
 
-/* ---------- 摆盘页面板 ---------- */
+/* ---------- 摆棋页面板 ---------- */
 .palette { flex-shrink: 0; }
 .palette .tool-row { display: flex; gap: 6px; padding: 8px 10px 4px; }
 .palette-row {
@@ -356,29 +374,28 @@ body {
 .opt-row .btn { flex: 1; }
 .opt-row.four { flex-wrap: wrap; }
 .opt-row.four .btn { flex: 1 1 44%; }
-.tool-hint {
-  margin: 0;
-  padding: 2px 10px 10px;
+.king-note {
+  margin: 8px 0 0;
   font-size: 12px;
   color: var(--ink-2);
   line-height: 1.6;
 }
-.tools #btn-review { margin: 0 10px 12px; width: calc(100% - 20px); }
+.tools #btn-review { margin-top: 8px; }
 
 /* ---------- 首页：logo 居中，按钮两侧环绕 ---------- */
 .home { position: relative; }
 .sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .sky img {
   position: absolute;
-  top: -14%;
+  top: -16%;
   width: 34px;
   height: 34px;
-  opacity: 0.09;
+  opacity: 0.06;
   animation: drift 30s linear infinite;
 }
 @keyframes drift {
-  from { transform: translateY(0) rotate(0deg); }
-  to { transform: translateY(140dvh) rotate(28deg); }
+  from { transform: translateY(0) rotate(var(--ang, 0deg)); }
+  to { transform: translateY(150dvh) rotate(var(--ang, 0deg)); }
 }
 
 .home-stage {

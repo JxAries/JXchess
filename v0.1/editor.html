@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- 摆盘页：棋盘居中，右侧为选子面板与操作栏；支持选择/擦除摆放、走子方、易位权利与 FEN 导出。 -->
+<!-- 摆棋页：棋盘居中，右侧为选子面板与操作栏；支持选择/擦除/放置、拖拽、先手与易位权利。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>摆盘 · JXchess</title>
+  <title>摆棋 · JXchess</title>
   <link rel="icon" type="image/svg+xml" href="./logo.svg" />
 </head>
 <body class="page">
@@ -16,7 +16,7 @@
     <nav class="page-nav">
       <a class="nav-link" href="./index.html">首页</a>
       <a class="nav-link" href="./review.html">复盘</a>
-      <a class="nav-link active" href="./editor.html">摆盘</a>
+      <a class="nav-link active" href="./editor.html">摆棋</a>
     </nav>
     <div class="spacer"></div>
   </header>
@@ -47,7 +47,7 @@
         </div>
 
         <div class="opt-group">
-          <div class="opt-label">走子方</div>
+          <div class="opt-label">先手</div>
           <div class="opt-row">
             <button id="btn-turn-w" class="btn opt-chip selected" type="button">白先</button>
             <button id="btn-turn-b" class="btn opt-chip" type="button">黑先</button>
@@ -70,9 +70,10 @@
           </div>
         </div>
 
-        <p class="tool-hint" id="tool-hint"></p>
-
-        <button id="btn-review" class="btn primary block" type="button">带此局面去复盘</button>
+        <div class="opt-group">
+          <button id="btn-review" class="btn primary block" type="button">带此局面去复盘</button>
+          <p class="king-note" id="king-note"></p>
+        </div>
       </div>
     </aside>
   </main>

@@ -1,5 +1,5 @@
 /**
- * 通用文本输入弹窗：复盘页粘贴 PGN、摆盘页输入 FEN 等场景共用。
+ * 通用文本输入弹窗：复盘页粘贴 PGN、摆棋页输入 FEN 等场景共用。
  * openTextDialog 打开弹窗并返回 Promise，确认时得到文本，取消时返回 null。
  */
 export interface DialogOptions {

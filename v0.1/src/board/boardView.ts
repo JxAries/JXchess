@@ -1,12 +1,19 @@
 /**
- * 棋盘渲染组件：把局面画成 8x8 的 DOM 网格，负责格子、坐标、棋子图片与各类高亮，
- * 并把点击的格子回调出去。只做表现，不走棋规则判断。
- * 重要函数：render、setFlipped、animateMove、markSelected、markTargets、markCheck。
+ * 棋盘渲染组件：把局面画成 8x8 的 DOM 网格，负责格子、坐标、棋子图片、各类高亮与拖拽事件，
+ * 并把点击/拖拽的格子回调出去。只做表现，不走棋规则判断。
+ * 重要函数：render、setFlipped、animateMove、setDragHandlers、markCheck。
  */
 import type { Chess, Square } from 'chess.js';
 import { pieceImage, splitSquare, type SquareName } from '../game/types';
 
 const FILES = 'abcdefgh';
+
+export interface DragHandlers {
+  /** 是否允许从该格开始拖拽 */
+  canStart(sq: SquareName): boolean;
+  /** 拖到目标格时回调 */
+  onDrop(from: SquareName, to: SquareName): void;
+}
 
 export class BoardView {
   readonly root: HTMLElement;
@@ -17,15 +24,18 @@ export class BoardView {
 
   private cells = new Map<SquareName, HTMLDivElement>();
   private imgs = new Map<SquareName, HTMLImageElement>();
+  private drag: DragHandlers | null = null;
+  private dragFrom: string | null = null;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
     this.root.className = 'board';
     container.appendChild(this.root);
     this.buildCells();
+    this.wireDrag();
   }
 
-  /** 按当前 flip 重建全部格子，需在翻转后由调用方重新绘制棋子 */
+  /** 按当前 flip 重建全部格子，调用方随后需重画棋子 */
   setFlipped(flipped: boolean): void {
     if (flipped === this.flip) return;
     this.flip = flipped;
@@ -45,7 +55,7 @@ export class BoardView {
         cell.dataset.square = sq;
         cell.classList.add((f + rank) % 2 === 0 ? 'dark' : 'light');
 
-        // 坐标：白方在下时列标在 a 列、行标在第 1 行；翻转后相反
+        // 坐标标注放在视觉最外侧一行/一列：白方在下时在 a 列与第 1 行，翻转后在 h 列与第 8 行
         const label = this.flip ? { file: 'h', rank: 8 } : { file: 'a', rank: 1 };
         if (file === label.file) {
           const span = document.createElement('span');
@@ -63,11 +73,12 @@ export class BoardView {
         const img = document.createElement('img');
         img.className = 'piece';
         img.alt = '';
+        img.draggable = true;
         img.style.visibility = 'hidden';
         cell.appendChild(img);
 
         cell.style.gridRowStart = String(this.flip ? rank : 9 - rank);
-        cell.style.gridColumnStart = String(this.flip ? 9 - f : f + 1);
+        cell.style.gridColumnStart = String(this.flip ? 8 - f : f + 1);
         cell.addEventListener('click', () => this.onPick?.(sq));
 
         this.root.appendChild(cell);
@@ -75,6 +86,43 @@ export class BoardView {
         this.imgs.set(sq, img);
       }
     }
+  }
+
+  /** 登记拖拽处理器；事件委托挂在棋盘根上，翻转重建格子后依然有效 */
+  setDragHandlers(handlers: DragHandlers | null): void {
+    this.drag = handlers;
+  }
+
+  private wireDrag(): void {
+    this.root.addEventListener('dragstart', (e) => {
+      const target = e.target as HTMLElement;
+      const img = target.closest<HTMLImageElement>('img.piece');
+      const cell = target.closest<HTMLElement>('.sq');
+      const sq = cell?.dataset.square;
+      const dt = e.dataTransfer;
+      if (!img || !sq || !this.drag || !this.drag.canStart(sq) || !dt) {
+        e.preventDefault();
+        return;
+      }
+      this.dragFrom = sq;
+      dt.effectAllowed = 'move';
+      dt.setData('text/plain', sq);
+    });
+    this.root.addEventListener('dragover', (e) => {
+      if (this.dragFrom) e.preventDefault();
+    });
+    this.root.addEventListener('drop', (e) => {
+      if (!this.dragFrom) return;
+      e.preventDefault();
+      const cell = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('.sq');
+      const to = cell?.dataset.square;
+      const from = this.dragFrom;
+      this.dragFrom = null;
+      if (from && to && from !== to) this.drag?.onDrop(from, to);
+    });
+    this.root.addEventListener('dragend', () => {
+      this.dragFrom = null;
+    });
   }
 
   /** 按 Chess 局面整体重画 */
@@ -85,7 +133,7 @@ export class BoardView {
     }
   }
 
-  /** 直接给某格设置图片，供摆盘页使用；传 null 表示空格 */
+  /** 直接给某格设置图片，供摆棋页使用；传 null 表示空格 */
   setSquareImg(sq: SquareName, src: string | null): void {
     const img = this.imgs.get(sq);
     if (!img) return;
@@ -102,11 +150,16 @@ export class BoardView {
     for (const sq of this.cells.keys()) this.setSquareImg(sq, null);
   }
 
-  /** 清除选中、目标、末步、将军四类高亮 */
+  /** 清除选中与目标类高亮（不含将军底与末步标，末步由刷新逻辑管理） */
   clearMarks(): void {
     for (const cell of this.cells.values()) {
-      cell.classList.remove('sel', 'target', 'target-capture', 'last', 'check');
+      cell.classList.remove('sel', 'target', 'target-capture');
     }
+  }
+
+  /** 清除将军红底 */
+  clearChecks(): void {
+    for (const cell of this.cells.values()) cell.classList.remove('check');
   }
 
   markSelected(sq: SquareName | null): void {
@@ -134,13 +187,13 @@ export class BoardView {
 
   /** 将军提醒：给被将军的王所在格加红色底 */
   markCheck(sq: SquareName | null): void {
-    for (const cell of this.cells.values()) cell.classList.remove('check');
+    this.clearChecks();
     if (sq) this.cells.get(sq)?.classList.add('check');
   }
 
   /**
-   * 棋子平滑移动动画：局面已更新后调用，复制一枚“残影”棋子从起点滑到终点，
-   * 用来盖住瞬间刷新的跳变，动画结束后自动移除。
+   * 平滑移动动画：局面已更新后调用，复制一枚“残影”棋子从起点滑到终点，
+   * 盖住瞬间刷新的跳变，动画结束后自动移除。
    */
   animateMove(from: SquareName, to: SquareName, durationMs = 190): void {
     if (!from || !to || from === to) return;
