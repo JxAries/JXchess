@@ -3,7 +3,6 @@
  * 支持 ?fen= 指定局面开局；含将军红格、走子动画与木质音效、棋盘翻转、
  * 变例记录与跳转、PGN 导入导出。终局时在主线的最后一步下方显示标准结果。
  */
-import '../style.css';
 import { BoardView } from '../board/boardView';
 import { BoardInput, type MovePlayed } from '../board/input';
 import { ReviewState } from '../game/gameState';
@@ -94,9 +93,10 @@ function refresh(play: MovePlayed | null): void {
   if (chess.inCheck()) board.markCheck(state.kingSquare(chess.turn()));
 
   if (play) {
+    // 吃子与将军同时发生时，用吃子音效覆盖将军音效
     if (play.capture) sfx.capture();
+    else if (chess.inCheck()) sfx.check();
     else sfx.move();
-    if (chess.inCheck()) sfx.check();
     board.animateMove(play.from, play.to);
   }
 
@@ -180,6 +180,17 @@ must('btn-flip').addEventListener('click', () => {
   flipped = !flipped;
   board.setFlipped(flipped);
   refresh(null);
+});
+
+// 支线管理：新建支线 / 删除当前支线
+must('btn-new-branch').addEventListener('click', () => {
+  state.armNewBranch();
+  toast('已在当前位置新建支线，走一步棋即记录到该支线');
+});
+must('btn-delete-branch').addEventListener('click', () => {
+  const removed = state.deleteCurrentVariation();
+  toast(removed ? '已删除当前支线' : '当前位置不在支线内');
+  if (removed) refresh(null);
 });
 
 refresh(null);

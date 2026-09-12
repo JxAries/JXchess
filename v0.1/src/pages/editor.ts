@@ -3,7 +3,6 @@
  * 支持选择移动、擦除、放置三种模式与拖拽移动；可设置先手方与双方易位权利，
  * 导出准确的 FEN 或带着局面跳去复盘；去复盘按钮在缺少王时置灰。
  */
-import '../style.css';
 import { BoardEditor } from '../editor/editorView';
 import { openTextDialog } from '../panels/dialog';
 import { PIECE_CN, PIECE_KINDS, pieceImage, type Color, type PieceKind, type SquareName } from '../game/types';

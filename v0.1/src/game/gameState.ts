@@ -21,6 +21,13 @@ export type PlayResult =
   | { ok: true; san: string; isVariation: boolean }
   | { ok: false; error: string };
 
+/** 棋谱面板用小字变例：tokens 为按回合排版的片段，activeStep 标示光标在链上的位置 */
+export interface VariationView {
+  tokens: string[];
+  active: boolean;
+  activeStep: number;
+}
+
 /** 一步着法及其子分支 */
 interface TreeNode {
   san: string;
@@ -37,6 +44,9 @@ export class ReviewState {
   meta: GameMeta = {};
   /** 是否由 PGN 导入：为真时新着法作为变例，为假时覆盖其后走法 */
   imported = false;
+
+  /** 是否已点过“新建分支”：下一步强制作为新支线 */
+  private branchArmed = false;
 
   /** 虚拟根节点，它的 children[0] 链即主线 */
   private root: TreeNode = this.makeNode('');
@@ -121,10 +131,8 @@ export class ReviewState {
     this.cursor = depth <= 0 ? null : (main[depth - 1] ?? null);
   }
 
-  /**
-   * 进入某条变例：depth 是“被替代主线步”所在行（同 goMainDepth 口径），
-   * index 是该位置第几条变例；默认跳到该变例最深处。
-   */
+  /** 进入某条变例：depth 是“被替代主线步”所在行（同 goMainDepth 口径），
+   * index 是该位置第几条变例；默认跳到该变例最深处。 */
   goVariation(depth: number, index: number): void {
     const main = this.mainPath();
     const holder = depth <= 0 ? this.root : main[depth - 1];
@@ -136,24 +144,84 @@ export class ReviewState {
     this.cursor = node;
   }
 
-  /** 某主线行（被替代步）下已有的变例列表；每项是该变例整条线的小字文本 */
-  variationsOfRow(row: number): Array<{ text: string; active: boolean }> {
+  /** 在某行位置下的第 index 条变例的分支起点节点 */
+  private variationStart(row: number, index: number): TreeNode | null {
+    const main = this.mainPath();
+    const holder = row <= 0 ? this.root : main[row - 1];
+    if (!holder) return null;
+    return holder.children.filter((_, i) => i > 0)[index] ?? null;
+  }
+
+  /** 光标位于以 start 为首节点的变例链上的第几步（0 起）；不在该链上返回 -1 */
+  private stepWithin(start: TreeNode, cursor: TreeNode | null): number {
+    let node: TreeNode | null = start;
+    let step = 0;
+    while (node) {
+      if (node === cursor) return step;
+      node = node.children[0];
+      step += 1;
+    }
+    return -1;
+  }
+
+  /**
+   * 某主线行下已有的变例，每项包含按“回合数 + 着法”排版后的文本片段。
+   * 白方开始的变例写成 1.e6 f5 这样的形式；黑方开始的写成 1.… e5 形式。
+   */
+  variationsOfRow(row: number): VariationView[] {
     const main = this.mainPath();
     const holder = row <= 0 ? this.root : main[row - 1];
     if (!holder) return [];
     const anchor = this.variationAnchor();
-    const list: Array<{ text: string; active: boolean }> = [];
+
+    // 该行位置的局面，用于计算回合数与行棋方
+    const base = new Chess(this.startFen);
+    for (let i = 0; i < row; i++) {
+      const step = main[i];
+      base.move({ from: step.from, to: step.to, promotion: step.promotion });
+    }
+
+    const views: VariationView[] = [];
     holder.children.forEach((child, i) => {
       if (i === 0) return;
-      const parts: string[] = [child.san];
-      let n = child;
-      while (n.children[0]) {
-        n = n.children[0];
-        parts.push(n.san);
+      const lineChess = new Chess(base.fen());
+      const tokens: string[] = [];
+      let node: TreeNode | null = child;
+      let first = true;
+      while (node) {
+        tokens.push(formatToken(lineChess, node.san, first));
+        lineChess.move({ from: node.from, to: node.to, promotion: node.promotion });
+        first = false;
+        node = node.children[0];
       }
-      list.push({ text: parts.join(' '), active: Boolean(anchor && anchor.row === row && anchor.index === list.length) });
+      const index = views.length;
+      const isActive = Boolean(anchor && anchor.row === row && anchor.index === index);
+      const start = child;
+      views.push({
+        tokens,
+        active: isActive,
+        activeStep: isActive ? this.stepWithin(start, this.cursor) : -1,
+      });
     });
-    return list;
+    return views;
+  }
+
+  /** 在当前位置预设“新建支线”：下一步着法即使与现有着法相同也会新建一条变例 */
+  armNewBranch(): void {
+    this.branchArmed = true;
+  }
+
+  /** 删除当前所在的支线；不在支线内返回 false */
+  deleteCurrentVariation(): boolean {
+    const anchor = this.variationAnchor();
+    if (!anchor) return false;
+    const start = this.variationStart(anchor.row, anchor.index);
+    if (!start) return false;
+    const parent = start.parent;
+    if (!parent) return false;
+    parent.children = parent.children.filter((c) => c !== start);
+    this.cursor = parent === this.root ? null : parent;
+    return true;
   }
 
   /** 最近一步的起止格与是否吃子，用于动画与标亮 */
@@ -191,7 +259,8 @@ export class ReviewState {
 
   /**
    * 走一步棋。若该着法在当前节点已存在则直接跳入；
-   * 导入棋谱模式下走出新着法会作为变例记录，未导入时则截断覆盖其后走法。
+   * 导入棋谱模式下走出新着法会作为变例记录，未导入时则截断覆盖其后走法；
+   * 点过“新建分支”后，下一步无论是否与现有着法相同都会新建支线。
    */
   playMove(from: Square, to: string, promotion?: PieceSymbol): PlayResult {
     const chess = this.chessNow();
@@ -201,13 +270,16 @@ export class ReviewState {
     } catch {
       return { ok: false, error: '这不是一步合法的走法。' };
     }
+    const armed = this.branchArmed;
     const holder = this.cursor ? this.cursor.children : this.root.children;
-    const same = holder.find(
-      (c) =>
-        c.from === from &&
-        c.to === to &&
-        (c.promotion ?? '') === (promotion ?? ''),
-    );
+    const same = armed
+      ? undefined
+      : holder.find(
+          (c) =>
+            c.from === from &&
+            c.to === to &&
+            (c.promotion ?? '') === (promotion ?? ''),
+        );
     if (same) {
       this.cursor = same;
       return { ok: true, san: same.san, isVariation: false };
@@ -219,16 +291,17 @@ export class ReviewState {
       to,
       capture: Boolean(move.captured),
       promotion,
-      parent: this.cursor,
+      parent: this.cursor ?? this.root,
       children: [],
     };
-    const branched = this.imported && holder.length > 0;
+    const branched = (this.imported || armed) && holder.length > 0;
     if (branched) {
-      holder.push(node); // 保留原主线，新增一条变例
+      holder.push(node); // 保留已有走法，新增一条变例
     } else {
       holder.length = 0; // 覆盖旧分支，作为新的主线延伸
       holder.push(node);
     }
+    this.branchArmed = false;
     this.cursor = node;
     return { ok: true, san: move.san, isVariation: branched };
   }
@@ -278,6 +351,7 @@ export class ReviewState {
     this.startFen = START_FEN;
     this.meta = {};
     this.imported = false;
+    this.branchArmed = false;
     this.root = this.makeNode('');
     this.cursor = null;
   }
@@ -289,6 +363,7 @@ export class ReviewState {
     this.startFen = result.startFen;
     this.meta = result.meta;
     this.imported = true;
+    this.branchArmed = false;
     this.root = this.makeNode('');
     this.cursor = null;
     const chess = new Chess(this.startFen);
@@ -300,7 +375,7 @@ export class ReviewState {
         to: move.to,
         capture: Boolean(move.captured),
         promotion: move.promotion,
-        parent: this.cursor,
+        parent: this.cursor ?? this.root,
         children: [],
       };
       const holder = this.cursor ? this.cursor.children : this.root.children;
@@ -320,6 +395,7 @@ export class ReviewState {
     this.startFen = fen;
     this.meta = {};
     this.imported = false;
+    this.branchArmed = false;
     this.root = this.makeNode('');
     this.cursor = null;
     return null;
@@ -355,4 +431,12 @@ export class ReviewState {
     const sans = this.mainPath().map((n) => n.san);
     return exportPgn(this.startFen, sans, this.meta);
   }
+}
+
+/** 把一个着法片段排版成 1.e4 / 1.… e5 / 后续着法 的文本形式 */
+function formatToken(chess: Chess, san: string, first: boolean): string {
+  const turn = chess.turn();
+  const num = chess.moveNumber();
+  if (turn === 'w') return `${num}.${san}`;
+  return first ? `${num}.… ${san}` : san;
 }

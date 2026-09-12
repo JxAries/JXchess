@@ -1,6 +1,7 @@
 /**
  * 棋谱面板：渲染主线走法并按回合两两成行；在被替代的主线步下方，
- * 以一行浅色小字列出该位置产生的变例整条线，点击可进入该变例。
+ * 以一行浅色小字列出该位置产生的变例（含回合序号与行棋方），
+ * 当前所在的变例整行高亮、当前着法单独标记，并自动横向滚动到当前着法位置。
  */
 import { ReviewState } from '../game/gameState';
 
@@ -17,27 +18,29 @@ export function renderMoveList(el: HTMLElement, state: ReviewState, cb: MoveCall
   const curDepth = state.mainDepth();
   const list = document.createElement('ol');
   list.className = 'moves';
+  /** 当前所在变例的行元素与其步序号，稍后用于自动滚动 */
+  const activeLines: Array<{ btn: HTMLButtonElement; step: number }> = [];
 
-  /** 追加某主线位置下的变例小字行 */
   function addVarRow(row: number): void {
-    const vars = state.variationsOfRow(row);
-    if (vars.length === 0) return;
+    const views = state.variationsOfRow(row);
+    if (views.length === 0) return;
     const li = document.createElement('li');
     li.className = 'var-row';
-    vars.forEach((v, j) => {
+    views.forEach((view, j) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'var-line';
-      if (v.active) btn.classList.add('active');
-      const tag = document.createElement('span');
-      tag.className = 'var-tag';
-      tag.textContent = '变着';
-      const text = document.createElement('span');
-      text.className = 'var-text';
-      text.textContent = v.text;
-      btn.append(tag, text);
+      if (view.active) btn.classList.add('active');
+      view.tokens.forEach((token, ti) => {
+        const span = document.createElement('span');
+        span.className = 'var-move';
+        if (view.active && ti === view.activeStep) span.classList.add('cur');
+        span.textContent = token;
+        btn.appendChild(span);
+      });
       btn.title = '进入这条变例';
       btn.addEventListener('click', () => cb.goVariation(row, j));
+      if (view.active) activeLines.push({ btn, step: view.activeStep });
       li.appendChild(btn);
     });
     list.appendChild(li);
@@ -45,7 +48,7 @@ export function renderMoveList(el: HTMLElement, state: ReviewState, cb: MoveCall
 
   const rounds = Math.ceil(total / 2);
   for (let round = 0; round < rounds; round++) {
-    if (round === 0) addVarRow(0); // 第一步行棋前的变例放在最上方
+    if (round === 0) addVarRow(0); // 第一步之前的变例放在最上方
 
     const li = document.createElement('li');
     const num = document.createElement('span');
@@ -71,13 +74,20 @@ export function renderMoveList(el: HTMLElement, state: ReviewState, cb: MoveCall
     }
     list.appendChild(li);
 
-    // 本轮两步棋各自位置下产生的变例
     const first = round * 2;
     const second = first + 1;
     if (first > 0) addVarRow(first);
     if (second < total) addVarRow(second);
   }
   el.appendChild(list);
+
+  // 变例文本随当前着法自动横向滚动：当前着法尽量靠左，回到第一步时即最左端
+  for (const { btn, step } of activeLines) {
+    const token = btn.querySelectorAll<HTMLElement>('.var-move')[step];
+    if (!token) continue;
+    const offset = token.getBoundingClientRect().left - btn.getBoundingClientRect().left + btn.scrollLeft;
+    btn.scrollLeft = Math.max(0, offset - 4);
+  }
 
   const active = el.querySelector<HTMLElement>('.san.cur, .var-line.active');
   if (active) active.scrollIntoView({ block: 'nearest' });
