@@ -4,6 +4,9 @@ ignore/
 # ---- npm 本地缓存（沙箱内安装时使用）----
 .npm-cache/
 
+# ---- 桌面打包产物 ----
+release/
+
 # ---- Node / 前端工程 ----
 node_modules/
 dist/

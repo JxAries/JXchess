@@ -1,7 +1,8 @@
 /**
  * 复盘页入口：装配棋盘、走棋交互、棋谱面板与底部播放控制。
- * 支持 ?fen= 指定局面开局；含将军红格、走子动画与木质音效、棋盘翻转、
- * 变例记录与跳转、PGN 导入导出。终局时在主线的最后一步下方显示标准结果。
+ * 支持 ?fen= 指定局面开局；含将军提醒、走子动画与木质音效、棋盘翻转、
+ * 变例记录与支线管理、PGN 导入导出；终局时在主线最后一步下方显示标准结果。
+ * 页面不使用浮动提示框，所有反馈都显示在棋谱面板内的一行小字上。
  */
 import { BoardView } from '../board/boardView';
 import { BoardInput, type MovePlayed } from '../board/input';
@@ -19,29 +20,34 @@ function must<T extends HTMLElement>(id: string): T {
 
 const state = new ReviewState();
 
-// 支持从摆棋页带着局面跳转过来
-const fenParam = new URLSearchParams(location.search).get('fen');
-if (fenParam) {
-  const error = state.setStartFen(fenParam);
-  if (error) toast(error);
-}
-
 const boardWrap = must('board-wrap');
 const moveListEl = must('move-list');
 const capWhiteEl = must('cap-white');
 const capBlackEl = must('cap-black');
+const panelNote = must('panel-note');
 const filePicker = must<HTMLInputElement>('file-picker');
+const btnNewBranch = must<HTMLButtonElement>('btn-new-branch');
+const btnDeleteBranch = must<HTMLButtonElement>('btn-delete-branch');
 
 const board = new BoardView(boardWrap);
 const sfx = new SoundFX();
 let flipped = false;
+let noteTimer = 0;
 
-function toast(message: string): void {
-  const div = document.createElement('div');
-  div.className = 'toast';
-  div.textContent = message;
-  document.body.appendChild(div);
-  window.setTimeout(() => div.remove(), 2600);
+/** 在棋谱面板内短暂显示一行提示，替代浮动弹窗 */
+function showNote(message: string): void {
+  panelNote.textContent = message;
+  window.clearTimeout(noteTimer);
+  noteTimer = window.setTimeout(() => {
+    panelNote.textContent = '';
+  }, 2800);
+}
+
+// 支持从摆棋页带着局面跳转过来
+const fenParam = new URLSearchParams(location.search).get('fen');
+if (fenParam) {
+  const error = state.setStartFen(fenParam);
+  if (error) showNote(error);
 }
 
 function renderCaptured(): void {
@@ -60,14 +66,14 @@ function renderCapRow(el: HTMLElement, label: string, kinds: PieceKind[], color:
     const img = document.createElement('img');
     img.src = pieceImage(color, kind);
     img.alt = kind;
+    img.draggable = false;
     el.appendChild(img);
   }
 }
 
 /** 终局时在主线的最后一步正下方写出标准结果行 */
 function renderResult(): void {
-  const existed = document.querySelector('#move-list .mv-result');
-  existed?.remove();
+  document.querySelector('#move-list .mv-result')?.remove();
   const status = state.statusText();
   let text = '';
   if (status === '白方胜') text = '1-0 · 白棋获胜';
@@ -78,6 +84,12 @@ function renderResult(): void {
   div.className = 'mv-result';
   div.textContent = text;
   moveListEl.appendChild(div);
+}
+
+/** 支线按钮状态：新建分支可切换待命，删除分支仅在支线内可用 */
+function updateBranchButtons(): void {
+  btnNewBranch.classList.toggle('selected', state.isBranchArmed());
+  btnDeleteBranch.disabled = !state.inVariation();
 }
 
 /** 整体刷新；play 非空时播放音效与滑动动画 */
@@ -112,11 +124,12 @@ function refresh(play: MovePlayed | null): void {
   });
   renderCaptured();
   renderResult();
+  updateBranchButtons();
 }
 
 function loadPgnText(text: string): void {
   const error = state.loadPgn(text);
-  if (error) toast(error);
+  if (error) showNote(error);
   else refresh(null);
 }
 
@@ -133,9 +146,9 @@ function downloadPgn(): void {
 }
 
 // 棋盘交互：点击与拖拽均在此触发刷新
-new BoardInput(board, state, { onChanged: (move) => refresh(move), onMessage: toast });
+new BoardInput(board, state, { onChanged: (move) => refresh(move), onMessage: showNote });
 
-// 底部播放控制：主线外的新变例只通过点击棋谱面板进入
+// 底部播放控制
 must('btn-start').addEventListener('click', () => {
   state.toStart();
   refresh(null);
@@ -182,15 +195,15 @@ must('btn-flip').addEventListener('click', () => {
   refresh(null);
 });
 
-// 支线管理：新建支线 / 删除当前支线
-must('btn-new-branch').addEventListener('click', () => {
-  state.armNewBranch();
-  toast('已在当前位置新建支线，走一步棋即记录到该支线');
+// 支线管理：新建支线是“待命”开关，删除支线仅在支线内生效
+btnNewBranch.addEventListener('click', () => {
+  state.toggleBranchArmed();
+  updateBranchButtons();
 });
-must('btn-delete-branch').addEventListener('click', () => {
-  const removed = state.deleteCurrentVariation();
-  toast(removed ? '已删除当前支线' : '当前位置不在支线内');
-  if (removed) refresh(null);
+btnDeleteBranch.addEventListener('click', () => {
+  if (!state.inVariation()) return;
+  state.deleteCurrentVariation();
+  refresh(null);
 });
 
 refresh(null);

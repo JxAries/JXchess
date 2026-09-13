@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 首页：logo 居中，标题在下，入口按钮分列两侧环绕；背景是棋子以不同倾角缓缓飘落的动效，鼠标为棋子跟随效果。 -->
+<!-- 首页：logo 居中，标题在下，入口按钮分列两侧；背景棋子由脚本随机生成并缓缓飘落，鼠标为棋子跟随效果。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -9,33 +9,24 @@
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body class="page home">
-  <!-- 飘落的棋子背景，纯装饰，各自带不同倾角 -->
-  <div class="sky" aria-hidden="true">
-    <img src="./pieces/wK.svg" alt="" width="36" height="36" style="left:8%;animation-duration:26s;--ang:8deg" />
-    <img src="./pieces/bQ.svg" alt="" width="36" height="36" style="left:18%;animation-duration:34s;animation-delay:-9s;--ang:-10deg" />
-    <img src="./pieces/wR.svg" alt="" width="36" height="36" style="left:30%;animation-duration:22s;animation-delay:-4s;--ang:14deg" />
-    <img src="./pieces/bN.svg" alt="" width="36" height="36" style="left:43%;animation-duration:38s;animation-delay:-18s;--ang:-6deg" />
-    <img src="./pieces/wB.svg" alt="" width="36" height="36" style="left:56%;animation-duration:25s;animation-delay:-12s;--ang:20deg" />
-    <img src="./pieces/bK.svg" alt="" width="36" height="36" style="left:68%;animation-duration:30s;animation-delay:-6s;--ang:-14deg" />
-    <img src="./pieces/wQ.svg" alt="" width="36" height="36" style="left:80%;animation-duration:21s;animation-delay:-3s;--ang:26deg" />
-    <img src="./pieces/bP.svg" alt="" width="36" height="36" style="left:90%;animation-duration:36s;animation-delay:-14s;--ang:-20deg" />
-  </div>
+  <!-- 飘落的棋子背景由 home.ts 随机生成，纯装饰 -->
+  <div class="sky" aria-hidden="true"></div>
 
   <main class="home-stage">
     <a class="entry flank left" href="./review.html">
-      <img src="./pieces/wK.svg" alt="" width="46" height="46" />
+      <img src="./pieces/wK.svg" alt="" width="46" height="46" draggable="false" />
       <span class="entry-name">复盘</span>
       <span class="entry-desc">导入棋谱，逐步回放</span>
     </a>
 
     <div class="home-center">
-      <div class="home-logo"><img src="./logo.svg" alt="JXchess logo" width="150" height="150" /></div>
+      <div class="home-logo"><img src="./logo.svg" alt="JXchess logo" width="150" height="150" draggable="false" /></div>
       <h1 class="home-title">JXchess</h1>
       <p class="home-sub">开源免费的国际象棋工具</p>
     </div>
 
     <a class="entry flank right" href="./editor.html">
-      <img src="./pieces/wB.svg" alt="" width="46" height="46" />
+      <img src="./pieces/wB.svg" alt="" width="46" height="46" draggable="false" />
       <span class="entry-name">摆棋</span>
       <span class="entry-desc">自由摆放，研究局面</span>
     </a>
@@ -45,7 +36,7 @@
     /* 提示：直接双击打开本文件时工程无法运行，需先通过 npm run dev 启动本地服务。 */
     if (location.protocol === 'file:') {
       var tip = document.createElement('div');
-      tip.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#8a4b2f;color:#fff;padding:10px 18px;text-align:center;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;';
+      tip.className = 'file-warning';
       tip.textContent = '直接双击 HTML 无法运行本工程。请在 v0.1 目录执行 npm install 后运行 npm run dev，再用浏览器访问 http://localhost:5173/';
       document.body.appendChild(tip);
     }

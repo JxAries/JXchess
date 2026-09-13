@@ -127,6 +127,7 @@ export class ReviewState {
 
   /** 摆到第 depth 步之后的主线位置 */
   goMainDepth(depth: number): void {
+    this.branchArmed = false;
     const main = this.mainPath();
     this.cursor = depth <= 0 ? null : (main[depth - 1] ?? null);
   }
@@ -134,6 +135,7 @@ export class ReviewState {
   /** 进入某条变例：depth 是“被替代主线步”所在行（同 goMainDepth 口径），
    * index 是该位置第几条变例；默认跳到该变例最深处。 */
   goVariation(depth: number, index: number): void {
+    this.branchArmed = false;
     const main = this.mainPath();
     const holder = depth <= 0 ? this.root : main[depth - 1];
     if (!holder) return;
@@ -209,6 +211,22 @@ export class ReviewState {
   /** 在当前位置预设“新建支线”：下一步着法即使与现有着法相同也会新建一条变例 */
   armNewBranch(): void {
     this.branchArmed = true;
+  }
+
+  /** 切换“新建支线”预设状态，返回切换后的值 */
+  toggleBranchArmed(): boolean {
+    this.branchArmed = !this.branchArmed;
+    return this.branchArmed;
+  }
+
+  /** 是否已预设新建支线 */
+  isBranchArmed(): boolean {
+    return this.branchArmed;
+  }
+
+  /** 当前是否位于某条支线内 */
+  inVariation(): boolean {
+    return this.variationAnchor() !== null;
   }
 
   /** 删除当前所在的支线；不在支线内返回 false */
@@ -307,6 +325,7 @@ export class ReviewState {
   }
 
   stepNext(): void {
+    this.branchArmed = false;
     if (this.cursor && this.cursor.children[0]) {
       this.cursor = this.cursor.children[0];
       return;
@@ -319,14 +338,17 @@ export class ReviewState {
   }
 
   stepBack(): void {
+    this.branchArmed = false;
     if (this.cursor) this.cursor = this.cursor.parent;
   }
 
   toStart(): void {
+    this.branchArmed = false;
     this.cursor = null;
   }
 
   toEnd(): void {
+    this.branchArmed = false;
     if (this.cursor === null || this.mainDepth() >= 0) {
       this.goMainDepth(this.mainlineLength());
     } else {

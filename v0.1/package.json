@@ -3,18 +3,49 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "JXchess v0.1 复盘棋盘：PGN 导入、逐步回放、摆盘研究",
+  "description": "JXchess v0.1 复盘棋盘：PGN 导入、逐步回放、摆棋研究",
+  "author": "谏贤 (JxAries)",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "app": "npm run build && electron .",
+    "package": "npm run build && electron-builder --win nsis portable"
   },
   "dependencies": {
     "chess.js": "^1.4.0"
   },
   "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
+  },
+  "build": {
+    "appId": "com.jxaries.jxchess",
+    "productName": "JXchess",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "public/logo.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "JXchess"
+    }
   }
 }

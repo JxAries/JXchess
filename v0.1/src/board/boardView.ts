@@ -26,6 +26,10 @@ export class BoardView {
   private imgs = new Map<SquareName, HTMLImageElement>();
   private drag: DragHandlers | null = null;
   private dragFrom: string | null = null;
+  private dragGhost: HTMLImageElement | null = null;
+  private pending: { sq: string; x: number; y: number; id: number } | null = null;
+  /** 拖拽结束后抑制随之而来的那次点击，避免误选中落点棋子 */
+  private suppressClick = false;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
@@ -73,13 +77,19 @@ export class BoardView {
         const img = document.createElement('img');
         img.className = 'piece';
         img.alt = '';
-        img.draggable = true;
+        img.draggable = false;
         img.style.visibility = 'hidden';
         cell.appendChild(img);
 
         cell.style.gridRowStart = String(this.flip ? rank : 9 - rank);
         cell.style.gridColumnStart = String(this.flip ? 8 - f : f + 1);
-        cell.addEventListener('click', () => this.onPick?.(sq));
+        cell.addEventListener('click', () => {
+          if (this.suppressClick) {
+            this.suppressClick = false;
+            return;
+          }
+          this.onPick?.(sq);
+        });
 
         this.root.appendChild(cell);
         this.cells.set(sq, cell);
@@ -93,36 +103,88 @@ export class BoardView {
     this.drag = handlers;
   }
 
+  /**
+   * 拖拽走子：使用指针事件自行实现，完全不依赖浏览器原生拖图，
+   * 因此既不会触发浏览器的拖动搜索，也不会因原生拖拽导致页面卡死。
+   * 按下后移动超过阈值才进入拖拽，轻点仍然是选中。
+   */
   private wireDrag(): void {
-    this.root.addEventListener('dragstart', (e) => {
-      const target = e.target as HTMLElement;
-      const img = target.closest<HTMLImageElement>('img.piece');
-      const cell = target.closest<HTMLElement>('.sq');
+    const squareAt = (x: number, y: number): string | null => {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      return el?.closest<HTMLElement>('.sq')?.dataset.square ?? null;
+    };
+
+    this.root.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const cell = (e.target as HTMLElement).closest<HTMLElement>('.sq');
       const sq = cell?.dataset.square;
-      const dt = e.dataTransfer;
-      if (!img || !sq || !this.drag || !this.drag.canStart(sq) || !dt) {
-        e.preventDefault();
-        return;
+      if (!sq || !this.drag || !this.drag.canStart(sq)) return;
+      this.pending = { sq, x: e.clientX, y: e.clientY, id: e.pointerId };
+      this.suppressClick = false;
+      this.root.setPointerCapture(e.pointerId);
+    });
+
+    this.root.addEventListener('pointermove', (e) => {
+      const pending = this.pending;
+      if (!pending) return;
+      if (!this.dragFrom) {
+        if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < 5) return;
+        this.beginDrag(pending.sq, e.clientX, e.clientY);
       }
-      this.dragFrom = sq;
-      dt.effectAllowed = 'move';
-      dt.setData('text/plain', sq);
+      if (!this.dragGhost) return;
+      const rect = this.dragGhost.getBoundingClientRect();
+      this.dragGhost.style.left = `${e.clientX - rect.width / 2}px`;
+      this.dragGhost.style.top = `${e.clientY - rect.height / 2}px`;
+      this.markDropTarget(squareAt(e.clientX, e.clientY));
     });
-    this.root.addEventListener('dragover', (e) => {
-      if (this.dragFrom) e.preventDefault();
-    });
-    this.root.addEventListener('drop', (e) => {
-      if (!this.dragFrom) return;
-      e.preventDefault();
-      const cell = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('.sq');
-      const to = cell?.dataset.square;
+
+    const finish = (e: PointerEvent): void => {
       const from = this.dragFrom;
-      this.dragFrom = null;
-      if (from && to && from !== to) this.drag?.onDrop(from, to);
+      this.pending = null;
+      if (!from) return;
+      const to = squareAt(e.clientX, e.clientY);
+      this.cleanupDrag();
+      this.suppressClick = true;
+      if (to && to !== from) this.drag?.onDrop(from, to);
+    };
+    this.root.addEventListener('pointerup', finish);
+    this.root.addEventListener('pointercancel', () => {
+      this.pending = null;
+      this.cleanupDrag();
     });
-    this.root.addEventListener('dragend', () => {
-      this.dragFrom = null;
-    });
+  }
+
+  private beginDrag(sq: string, x: number, y: number): void {
+    const img = this.imgs.get(sq);
+    if (!img || img.style.visibility === 'hidden') return;
+    this.dragFrom = sq;
+    const rect = img.getBoundingClientRect();
+    const ghost = img.cloneNode(true) as HTMLImageElement;
+    ghost.className = 'piece drag-ghost';
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.left = `${x - rect.width / 2}px`;
+    ghost.style.top = `${y - rect.height / 2}px`;
+    document.body.appendChild(ghost);
+    this.dragGhost = ghost;
+    img.style.opacity = '0.35';
+  }
+
+  private markDropTarget(sq: string | null): void {
+    for (const cell of this.cells.values()) cell.classList.remove('drop');
+    if (sq) this.cells.get(sq)?.classList.add('drop');
+  }
+
+  private cleanupDrag(): void {
+    const from = this.dragFrom;
+    if (from) {
+      const img = this.imgs.get(from);
+      if (img) img.style.opacity = '';
+    }
+    this.dragGhost?.remove();
+    this.dragGhost = null;
+    this.dragFrom = null;
+    for (const cell of this.cells.values()) cell.classList.remove('drop');
   }
 
   /** 按 Chess 局面整体重画 */
