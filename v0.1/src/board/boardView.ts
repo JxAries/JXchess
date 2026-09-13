@@ -139,9 +139,17 @@ export class BoardView {
     });
 
     const finish = (e: PointerEvent): void => {
+      const pending = this.pending;
       const from = this.dragFrom;
       this.pending = null;
-      if (!from) return;
+      if (!from) {
+        // 未进入拖拽：按普通点击处理。指针捕获会让原生 click 不再落在格子上，所以在这里补回。
+        if (pending) {
+          this.suppressClick = true;
+          this.onPick?.(pending.sq);
+        }
+        return;
+      }
       const to = squareAt(e.clientX, e.clientY);
       this.cleanupDrag();
       this.suppressClick = true;

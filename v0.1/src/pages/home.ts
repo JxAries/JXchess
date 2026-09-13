@@ -8,23 +8,24 @@ function buildFallingPieces(): void {
   const sky = document.querySelector('.sky');
   if (!sky) return;
   const pieces = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP', 'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'];
-  const count = 26;
+  const count = 16;
   const fragment = document.createDocumentFragment();
   for (let i = 0; i < count; i++) {
     const img = document.createElement('img');
     img.src = `pieces/${pieces[Math.floor(Math.random() * pieces.length)]}.svg`;
     img.alt = '';
     img.draggable = false;
-    const size = 26 + Math.round(Math.random() * 20);
-    const angle = Math.round(Math.random() * 80 - 40);
-    const angleEnd = angle + Math.round(Math.random() * 50 - 25);
+    const size = 24 + Math.round(Math.random() * 16);
+    // 起始与结束角度差得足够大，下落过程中能明显看到缓慢旋转
+    const angle = Math.round(Math.random() * 70 - 35);
+    const spin = (Math.random() < 0.5 ? -1 : 1) * (70 + Math.round(Math.random() * 120));
     img.width = size;
     img.height = size;
-    img.style.left = `${Math.round(Math.random() * 96)}%`;
-    img.style.animationDuration = `${16 + Math.round(Math.random() * 26)}s`;
+    img.style.left = `${Math.round(Math.random() * 94)}%`;
+    img.style.animationDuration = `${18 + Math.round(Math.random() * 24)}s`;
     img.style.animationDelay = `-${Math.round(Math.random() * 40)}s`;
     img.style.setProperty('--ang', `${angle}deg`);
-    img.style.setProperty('--ang2', `${angleEnd}deg`);
+    img.style.setProperty('--ang2', `${angle + spin}deg`);
     fragment.appendChild(img);
   }
   sky.appendChild(fragment);

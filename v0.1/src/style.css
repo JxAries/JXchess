@@ -10,9 +10,9 @@
   --line: #e3ded5;
   --accent: #8a3b3b;
   --accent-soft: #f6edeb;
-  --sq-light: #fbf9f5;
-  --sq-dark: #d9d5ce;
-  --grid: rgba(43, 42, 40, 0.16);
+  --sq-light: #fcfbf8;
+  --sq-dark: #f2efe9;
+  --grid: rgba(43, 42, 40, 0.2);
   --bw: min(calc(100dvh - 210px), 640px);
 }
 
@@ -55,6 +55,7 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   text-decoration: none;
   font-size: 13px;
   letter-spacing: 0.03em;
+  transition: color 0.15s ease;
 }
 .nav-link:hover { color: var(--accent); }
 .nav-link.active { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
@@ -71,6 +72,7 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   font-family: inherit;
   letter-spacing: 0.02em;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: 0.38; cursor: not-allowed; }
@@ -120,8 +122,10 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   width: 100%;
   height: 100%;
   pointer-events: none;
-  filter: drop-shadow(0 1px 1px rgba(43, 42, 40, 0.2));
+  filter: drop-shadow(0 1px 2px rgba(43, 42, 40, 0.34));
+  transition: transform 0.12s ease;
 }
+.sq:hover img.piece { transform: translateY(-1px); }
 
 /* 拖拽时跟随鼠标的棋子 */
 .piece.drag-ghost {
@@ -150,10 +154,20 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .sq.light .coord { color: rgba(114, 109, 102, 0.8); }
 .sq.dark .coord { color: rgba(90, 85, 78, 0.85); }
 
-/* 选中、上一步、将军都用描边而非大色块 */
+/* 选中、上一步用描边；将军用一圈由深到浅的暗红圆形底色 */
 .sq.sel { box-shadow: inset 0 0 0 2px var(--accent); }
 .sq.last { box-shadow: inset 0 0 0 2px rgba(43, 42, 40, 0.3); }
-.sq.check { box-shadow: inset 0 0 0 3px rgba(138, 59, 59, 0.6); }
+.sq.check::before {
+  content: "";
+  position: absolute;
+  left: 14%;
+  top: 14%;
+  width: 72%;
+  height: 72%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(138, 59, 59, 0.45) 0%, rgba(138, 59, 59, 0.22) 55%, rgba(138, 59, 59, 0.02) 78%, transparent 82%);
+  pointer-events: none;
+}
 .sq.drop { box-shadow: inset 0 0 0 2px var(--accent); }
 .sq.target::after {
   content: "";
@@ -210,6 +224,13 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   display: flex;
   flex-direction: column;
   min-height: 0;
+  animation: rise 0.26s ease both;
+}
+
+/* 轻柔的入场与悬停动效，让界面更灵动 */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
 }
 .panel-head {
   padding: 10px 12px;
@@ -397,7 +418,7 @@ button.var-line.active .var-move.cur { box-shadow: inset 0 -1px 0 var(--accent);
   gap: 52px;
   padding: 24px;
 }
-.home-center { display: flex; flex-direction: column; align-items: center; }
+.home-center { display: flex; flex-direction: column; align-items: center; animation: rise 0.32s ease both; }
 .home-logo img { width: 150px; height: 150px; object-fit: contain; }
 .home-title { margin: 12px 0 0; font-size: 42px; font-weight: 500; letter-spacing: 0.06em; }
 .home-sub { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; letter-spacing: 0.04em; }
@@ -429,7 +450,26 @@ button.var-line.active .var-move.cur { box-shadow: inset 0 -1px 0 var(--accent);
   will-change: transform;
 }
 .fx-king { width: 34px; height: 34px; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.3)); }
-.fx-knight { width: 26px; height: 26px; opacity: 0.92; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.24)); }
+.fx-knight { width: 34px; height: 34px; opacity: 0.95; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.24)); }
+
+/* 指针锁定位置的墙角式标记：一横一竖 */
+.fx-lock {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.fx-lock::before,
+.fx-lock::after {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+  border-radius: 1px;
+}
+.fx-lock::before { left: 7px; top: 7px; width: 9px; height: 1.5px; }
+.fx-lock::after { left: 7px; top: 7px; width: 1.5px; height: 9px; }
 
 /* ---------- 摆棋页面板 ---------- */
 .palette { flex-shrink: 0; }

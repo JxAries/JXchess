@@ -1,0 +1,33 @@
+[package]
+name = "jxchess"
+version = "0.1.0"
+description = "JXchess 国际象棋复盘与摆棋工具"
+authors = ["谏贤 (JxAries)"]
+license = "MPL-2.0"
+repository = "https://github.com/JxAries/JXchess"
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "jxchess_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-log = "2"
+
+# 发布构建：去掉符号并开启 LTO，显著减小体积
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "s"
+panic = "abort"
