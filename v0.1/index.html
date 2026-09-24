@@ -32,15 +32,6 @@
     </a>
   </main>
 
-  <script>
-    /* 提示：直接双击打开本文件时工程无法运行，需先通过 npm run dev 启动本地服务。 */
-    if (location.protocol === 'file:') {
-      var tip = document.createElement('div');
-      tip.className = 'file-warning';
-      tip.textContent = '直接双击 HTML 无法运行本工程。请在 v0.1 目录执行 npm install 后运行 npm run dev，再用浏览器访问 http://localhost:5173/';
-      document.body.appendChild(tip);
-    }
-  </script>
   <script type="module" src="./src/pages/home.ts"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 复盘页：棋盘居中，右侧棋谱面板；导入导出按钮在面板顶部，播放控制条贴棋盘下方。 -->
+<!-- 复盘页：棋盘居中，右侧棋谱面板；播放控制与导入导出都在面板内，棋盘下方不再留控制条。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -25,12 +25,6 @@
   <main class="main">
     <div class="board-stage">
       <div class="board-wrap" id="board-wrap"></div>
-      <div class="ctlbar" id="ctlbar">
-        <button id="btn-start" class="ctl" type="button" title="回到开局">⏮</button>
-        <button id="btn-prev" class="ctl" type="button" title="上一步">◀</button>
-        <button id="btn-next" class="ctl" type="button" title="下一步">▶</button>
-        <button id="btn-end" class="ctl" type="button" title="跳到终局">⏭</button>
-      </div>
     </div>
 
     <aside class="side">
@@ -45,6 +39,13 @@
           <button id="btn-new-branch" class="btn" type="button" title="在当前位置新建一条支线，接着走一步即进入该支线">新建分支</button>
           <button id="btn-delete-branch" class="btn" type="button" title="删除当前所在的支线">删除分支</button>
         </div>
+        <!-- 播放控制：紧跟在按钮组下方、得子行上方，不再单独占棋盘下的一行 -->
+        <div class="ctlbar" id="ctlbar">
+          <button id="btn-start" class="ctl" type="button" title="回到开局">⏮</button>
+          <button id="btn-prev" class="ctl" type="button" title="上一步">◀</button>
+          <button id="btn-next" class="ctl" type="button" title="下一步">▶</button>
+          <button id="btn-end" class="ctl" type="button" title="跳到终局">⏭</button>
+        </div>
         <p class="panel-note" id="panel-note"></p>
         <div class="cap-row" id="cap-white" title="白方得子"></div>
         <div class="cap-row" id="cap-black" title="黑方得子"></div>
@@ -53,15 +54,6 @@
     </aside>
   </main>
 
-  <script>
-    /* 提示：直接双击打开本文件时工程无法运行，需先通过 npm run dev 启动本地服务。 */
-    if (location.protocol === 'file:') {
-      var tip = document.createElement('div');
-      tip.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#8a4b2f;color:#fff;padding:10px 18px;text-align:center;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;';
-      tip.textContent = '直接双击 HTML 无法运行本工程。请在 v0.1 目录执行 npm install 后运行 npm run dev，再用浏览器访问 http://localhost:5173/review.html';
-      document.body.appendChild(tip);
-    }
-  </script>
   <script type="module" src="./src/pages/review.ts"></script>
 </body>
 </html>

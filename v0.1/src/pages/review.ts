@@ -146,7 +146,12 @@ function downloadPgn(): void {
 }
 
 // 棋盘交互：点击与拖拽均在此触发刷新
-new BoardInput(board, state, { onChanged: (move) => refresh(move), onMessage: showNote });
+new BoardInput(board, state, {
+  onChanged: (move) => refresh(move),
+  onMessage: showNote,
+  // 拖拽中途松手（或落到非法格）时，把棋盘恢复成常规高亮
+  onDragEnd: () => refresh(null),
+});
 
 // 底部播放控制
 must('btn-start').addEventListener('click', () => {

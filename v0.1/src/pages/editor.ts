@@ -50,7 +50,13 @@ function onBoardPick(sq: SquareName): void {
     return;
   }
   if (mode.kind === 'place') {
-    editor.apply(sq, { mode: 'place', color: mode.color, kind: mode.piece });
+    // 点同一枚棋子到已经摆着它的格子 = 移除，省去反复切到擦除按钮
+    const existing = editor.getAt(sq);
+    if (existing && existing.color === mode.color && existing.kind === mode.piece) {
+      editor.apply(sq, { mode: 'erase' });
+    } else {
+      editor.apply(sq, { mode: 'place', color: mode.color, kind: mode.piece });
+    }
     clearSelect();
     return;
   }

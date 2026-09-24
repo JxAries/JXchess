@@ -37,10 +37,3 @@ export function exportPgn(startFen: string, moves: readonly string[], meta: Game
   for (const [key, value] of Object.entries(meta)) chess.header(key, value);
   return chess.pgn();
 }
-
-/** 从起点回放前 upTo 步，返回对应局面；缺省回放全部 */
-export function replay(startFen: string, moves: readonly string[], upTo = moves.length): Chess {
-  const chess = new Chess(startFen);
-  for (let i = 0; i < upTo; i++) chess.move(moves[i]);
-  return chess;
-}

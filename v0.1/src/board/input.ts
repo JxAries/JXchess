@@ -20,6 +20,8 @@ export interface ReviewHooks {
   onChanged(move: MovePlayed): void;
   /** 提示一条给用户看的信息 */
   onMessage(message: string): void;
+  /** 拖拽结束但未落子时触发，供页面恢复常规高亮 */
+  onDragEnd(): void;
 }
 
 export class BoardInput {
@@ -38,6 +40,18 @@ export class BoardInput {
         return Boolean(piece && piece.color === this.state.chessNow().turn());
       },
       onDrop: (from, to) => void this.tryMove(from, to),
+      // 起拖时亮出这个子的全部合法落点，拖拽过程中就能看清能放到哪
+      onDragStart: (from) => {
+        const targets = this.state.legalMovesFrom(from as Square);
+        this.board.clearMarks();
+        this.board.markSelected(from);
+        this.board.markTargets(
+          targets.map((t) => t.to),
+          targets.filter((t) => t.capture).map((t) => t.to),
+        );
+      },
+      // 拖拽结束但没有成功落子时，恢复常规高亮（上一步、选中态等）
+      onDragEnd: () => this.hooks.onDragEnd(),
     });
   }
 

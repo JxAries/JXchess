@@ -208,11 +208,6 @@ export class ReviewState {
     return views;
   }
 
-  /** 在当前位置预设“新建支线”：下一步着法即使与现有着法相同也会新建一条变例 */
-  armNewBranch(): void {
-    this.branchArmed = true;
-  }
-
   /** 切换“新建支线”预设状态，返回切换后的值 */
   toggleBranchArmed(): boolean {
     this.branchArmed = !this.branchArmed;

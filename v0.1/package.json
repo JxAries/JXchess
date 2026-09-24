@@ -11,8 +11,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "app": "tauri dev",
-    "package": "tauri build",
-    "package:setup": "tauri build --bundles nsis"
+    "stage:webview2": "node scripts/stage-webview2-loader.mjs",
+    "package": "npm run stage:webview2 && tauri build",
+    "package:setup": "npm run stage:webview2 && tauri build --bundles nsis",
+    "package:msvc": "node scripts/stage-webview2-loader.mjs --target x86_64-pc-windows-msvc && tauri build --target x86_64-pc-windows-msvc --bundles nsis"
   },
   "dependencies": {
     "chess.js": "^1.4.0"

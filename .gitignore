@@ -1,11 +1,15 @@
-# ---- 本地提示词与个人文件，不提交 GitHub ----
+# ---- 本地个人文件（工具链、临时笔记等），不提交 GitHub ----
 ignore/
 
 # ---- npm 本地缓存（沙箱内安装时使用）----
 .npm-cache/
 
-# ---- 桌面打包产物 ----
+# ---- 测试用可执行文件与桌面打包产物 ----
+# 我们自己测试用的免安装 exe 与安装包都不进仓库；正式发布走 GitHub Releases。
+# 注意不要写成全局 *.exe，否则会误伤 ignore/ 之外将来可能需要的脚本。
 release/
+v0.1/release/
+v0.1/src-tauri/target/
 
 # ---- Node / 前端工程 ----
 node_modules/

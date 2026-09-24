@@ -1,8 +1,12 @@
 /**
- * 首页棋子光标：黑王作为指针（带墙角式锁定标记），黑马在后跟随。
- * 马与王保持较大间距；快速移动时受速度上限限制形成延迟跟随；
- * 指针停下后，马会以停下的位置为中心向随机方向小幅蹦跳；
- * 跳跃幅度由马自身的实际移动量驱动，因此慢速移动也不会抽搐。
+ * 首页棋子光标：黑王作为指针，黑马在后方按固定间距跟随。
+ *
+ * 设计取舍（不要再加回跳跃/游走）：早先版本让马在指针停下后随机小范围蹦跳，
+ * 即使把跳跃幅度绑到马的实际位移上，指针微动与帧率波动仍会让 hop 值忽大忽小，
+ * 看起来就是抽搐。现在只保留「跟随 + 间距」：
+ *   - 指针移动时，马的目标点落在指针反方向的固定距离处，因此始终跟在王后面；
+ *   - 按速度上限逐步逼近目标，形成延迟跟随的柔软感；
+ *   - 任何情况下马都不会贴到王身上，距离不足时直接推到最小间距之外。
  * 仅首页启用，触屏设备或系统开启"减少动态效果"时自动回退为普通指针。
  */
 export function initChessCursor(): void {
@@ -26,46 +30,39 @@ export function initChessCursor(): void {
   knight.draggable = false;
   knight.className = 'fx-cursor fx-knight';
 
-  const lock = document.createElement('div');
-  lock.className = 'fx-lock';
-  lock.setAttribute('aria-hidden', 'true');
+  document.body.append(king, knight);
 
-  document.body.append(king, knight, lock);
+  /** 马与王的目标间距。马与王同尺寸，这个值决定视觉上的"落在后面多远" */
+  const MIN_DIST = 96;
+  /** 马每帧最大位移。取值偏大，保证指针急停后马能迅速补位 */
+  const MAX_STEP = 13;
 
-  const MIN_DIST = 78; // 马与王的最小间距
-  const MAX_STEP = 7; // 马每帧最大位移，形成延迟跟随
-  const WANDER_MIN = 20;
-  const WANDER_MAX = 40;
-
-  let pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  let knightPos = { x: pointer.x - MIN_DIST, y: pointer.y };
+  const pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  /** 马的当前位置；初值取指针左后方，避免开场第一帧从屏幕中心冲进来 */
+  const knightPos = { x: pointer.x - MIN_DIST, y: pointer.y };
+  /** 上一帧的指针位置，用来判断移动方向与速度 */
   let lastPointer = { ...pointer };
-  let stillTime = 0;
-  let wanderTarget = { ...knightPos };
-  let wanderAge = 0;
-  let hopPhase = 0;
-  let hopAmp = 0;
+  /**
+   * 最近一次有效移动方向（单位向量），初值指向左方。
+   * 关键：目标点始终由「指针当前位置 + 这个方向」算出，而不是在指针停下时
+   * 把目标改写成马当前位置 —— 后者会让马停在半路，与王隔开一大段距离。
+   */
+  let dirX = -1;
+  let dirY = 0;
 
   const show = (visible: boolean): void => {
     const opacity = visible ? '1' : '0';
     king.style.opacity = opacity;
-    lock.style.opacity = visible ? '0.85' : '0';
     knight.style.opacity = visible ? '0.95' : '0';
   };
 
   window.addEventListener('pointermove', (e) => {
-    pointer = { x: e.clientX, y: e.clientY };
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
     show(true);
   });
   document.addEventListener('mouseleave', () => show(false));
   window.addEventListener('blur', () => show(false));
-
-  const pickWanderTarget = (): void => {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = WANDER_MIN + Math.random() * (WANDER_MAX - WANDER_MIN);
-    wanderTarget = { x: pointer.x + Math.cos(angle) * radius, y: pointer.y + Math.sin(angle) * radius };
-    wanderAge = 0;
-  };
 
   const loop = (): void => {
     const dx = pointer.x - lastPointer.x;
@@ -73,34 +70,23 @@ export function initChessCursor(): void {
     const pointerSpeed = Math.hypot(dx, dy);
     lastPointer = { ...pointer };
 
-    let target: { x: number; y: number };
-    let maxStep = MAX_STEP;
-
-    if (pointerSpeed > 1.2) {
-      // 运动中：目标落在指针反方向固定距离处，保证马始终落在王后面
-      stillTime = 0;
-      const len = Math.max(pointerSpeed, 0.001);
-      target = { x: pointer.x - (dx / len) * MIN_DIST, y: pointer.y - (dy / len) * MIN_DIST };
-    } else {
-      // 静止：以停下的位置为中心，随机方向小步蹦跳（不再平滑环绕）
-      stillTime += 1 / 60;
-      if (stillTime > 0.3) {
-        wanderAge += 1 / 60;
-        const nearTarget = Math.hypot(knightPos.x - wanderTarget.x, knightPos.y - wanderTarget.y) < 8;
-        if (wanderAge > 0.55 || nearTarget) pickWanderTarget();
-        target = wanderTarget;
-        maxStep = 4.2;
-      } else {
-        target = { x: knightPos.x, y: knightPos.y };
-      }
+    // 仅在指针确实移动时更新方向；指针静止时沿用上一方向，
+    // 因此目标点仍然挂在指针身上，马会一路补位到正确的间距。
+    if (pointerSpeed > 0.5) {
+      const len = pointerSpeed;
+      dirX = dx / len;
+      dirY = dy / len;
     }
 
-    const toX = target.x - knightPos.x;
-    const toY = target.y - knightPos.y;
+    const targetX = pointer.x - dirX * MIN_DIST;
+    const targetY = pointer.y - dirY * MIN_DIST;
+
+    // 按速度上限逐步逼近目标，形成延迟跟随
+    const toX = targetX - knightPos.x;
+    const toY = targetY - knightPos.y;
     const dist = Math.hypot(toX, toY);
-    let moved = 0;
     if (dist > 0.5) {
-      moved = Math.min(dist, maxStep);
+      const moved = Math.min(dist, MAX_STEP);
       knightPos.x += (toX / dist) * moved;
       knightPos.y += (toY / dist) * moved;
     }
@@ -112,17 +98,12 @@ export function initChessCursor(): void {
     if (sep < MIN_DIST) {
       const nx = sep < 0.001 ? -1 : sepX / sep;
       const ny = sep < 0.001 ? 0 : sepY / sep;
-      knightPos = { x: pointer.x + nx * MIN_DIST, y: pointer.y + ny * MIN_DIST };
+      knightPos.x = pointer.x + nx * MIN_DIST;
+      knightPos.y = pointer.y + ny * MIN_DIST;
     }
 
-    // 跳跃幅度由马的移动量驱动：静止时自然收敛，不会抖动
-    hopPhase += moved * 0.34;
-    hopAmp += (Math.min(moved, 6) / 6 * 9 - hopAmp) * 0.2;
-    const hop = Math.abs(Math.sin(hopPhase)) * hopAmp;
-
     king.style.transform = `translate(${pointer.x}px, ${pointer.y}px) translate(-50%, -50%)`;
-    knight.style.transform = `translate(${knightPos.x}px, ${knightPos.y}px) translate(-50%, -50%) translateY(${-hop}px)`;
-    lock.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
+    knight.style.transform = `translate(${knightPos.x}px, ${knightPos.y}px) translate(-50%, -50%)`;
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);

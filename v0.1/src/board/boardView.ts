@@ -4,7 +4,7 @@
  * 重要函数：render、setFlipped、animateMove、setDragHandlers、markCheck。
  */
 import type { Chess, Square } from 'chess.js';
-import { pieceImage, splitSquare, type SquareName } from '../game/types';
+import { pieceImage, type SquareName } from '../game/types';
 
 const FILES = 'abcdefgh';
 
@@ -13,6 +13,10 @@ export interface DragHandlers {
   canStart(sq: SquareName): boolean;
   /** 拖到目标格时回调 */
   onDrop(from: SquareName, to: SquareName): void;
+  /** 进入拖拽时回调，供页面亮出该子的全部合法落点 */
+  onDragStart?(from: SquareName): void;
+  /** 拖拽结束（无论是否成功落子）时回调，供页面恢复常规高亮 */
+  onDragEnd?(): void;
 }
 
 export class BoardView {
@@ -28,8 +32,6 @@ export class BoardView {
   private dragFrom: string | null = null;
   private dragGhost: HTMLImageElement | null = null;
   private pending: { sq: string; x: number; y: number; id: number } | null = null;
-  /** 拖拽结束后抑制随之而来的那次点击，避免误选中落点棋子 */
-  private suppressClick = false;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
@@ -81,16 +83,21 @@ export class BoardView {
         img.style.visibility = 'hidden';
         cell.appendChild(img);
 
+        // 将军红光层：单独一层且层级低于棋子，避免红光盖住王。
+        // 深色格的排线占了 ::before，所以这里用独立元素而不是伪元素。
+        const glow = document.createElement('span');
+        glow.className = 'glow';
+        cell.appendChild(glow);
+
+        // 状态高亮层：选中与落点提示。同样独立一层，层级高于排线。
+        const overlay = document.createElement('span');
+        overlay.className = 'hl';
+        cell.appendChild(overlay);
+
         cell.style.gridRowStart = String(this.flip ? rank : 9 - rank);
         cell.style.gridColumnStart = String(this.flip ? 8 - f : f + 1);
-        cell.addEventListener('click', () => {
-          if (this.suppressClick) {
-            this.suppressClick = false;
-            return;
-          }
-          this.onPick?.(sq);
-        });
-
+        // 点击与拖拽统一由 wireDrag 的指针事件处理，这里不再挂 click：
+        // 旧版同时挂 click 和指针事件，两条通路互相抑制，导致要点两次才能走子。
         this.root.appendChild(cell);
         this.cells.set(sq, cell);
         this.imgs.set(sq, img);
@@ -114,13 +121,16 @@ export class BoardView {
       return el?.closest<HTMLElement>('.sq')?.dataset.square ?? null;
     };
 
+    /**
+     * 按下：记下起点与坐标。这里不做任何判定，先捕获指针，
+     * 后续是「点」还是「拖」由 pointermove 的距离阈值决定。
+     */
     this.root.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || !this.drag) return;
       const cell = (e.target as HTMLElement).closest<HTMLElement>('.sq');
       const sq = cell?.dataset.square;
-      if (!sq || !this.drag || !this.drag.canStart(sq)) return;
+      if (!sq) return;
       this.pending = { sq, x: e.clientX, y: e.clientY, id: e.pointerId };
-      this.suppressClick = false;
       this.root.setPointerCapture(e.pointerId);
     });
 
@@ -128,8 +138,12 @@ export class BoardView {
       const pending = this.pending;
       if (!pending) return;
       if (!this.dragFrom) {
+        // 只有超过阈值且该格允许起拖时才进入拖拽；否则仍算点击
         if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < 5) return;
-        this.beginDrag(pending.sq, e.clientX, e.clientY);
+        if (!this.drag?.canStart(pending.sq)) return;
+        if (!this.beginDrag(pending.sq, e.clientX, e.clientY)) return;
+        // 通知页面亮出这个子的全部合法落点，方便拖拽时对准
+        this.drag?.onDragStart?.(pending.sq);
       }
       if (!this.dragGhost) return;
       const rect = this.dragGhost.getBoundingClientRect();
@@ -138,33 +152,38 @@ export class BoardView {
       this.markDropTarget(squareAt(e.clientX, e.clientY));
     });
 
+    /**
+     * 抬起：唯一的走子/选中出口。
+     * 未进入拖拽 → 按点击处理，通知 onPick 所在格（选中、走子、取消都在页面侧判断）；
+     * 已进入拖拽 → 落点合法则 onDrop。
+     * 因为点击也走这条通路，不再需要「抑制原生 click」，也就不会吃掉下一次点击。
+     */
     const finish = (e: PointerEvent): void => {
       const pending = this.pending;
       const from = this.dragFrom;
       this.pending = null;
       if (!from) {
-        // 未进入拖拽：按普通点击处理。指针捕获会让原生 click 不再落在格子上，所以在这里补回。
-        if (pending) {
-          this.suppressClick = true;
-          this.onPick?.(pending.sq);
-        }
+        if (pending) this.onPick?.(pending.sq);
         return;
       }
       const to = squareAt(e.clientX, e.clientY);
       this.cleanupDrag();
-      this.suppressClick = true;
       if (to && to !== from) this.drag?.onDrop(from, to);
+      else this.drag?.onDragEnd?.();
     };
     this.root.addEventListener('pointerup', finish);
     this.root.addEventListener('pointercancel', () => {
+      const wasDragging = this.dragFrom !== null;
       this.pending = null;
       this.cleanupDrag();
+      if (wasDragging) this.drag?.onDragEnd?.();
     });
   }
 
-  private beginDrag(sq: string, x: number, y: number): void {
+  /** 开始拖拽；起点无子或不可见时返回 false */
+  private beginDrag(sq: string, x: number, y: number): boolean {
     const img = this.imgs.get(sq);
-    if (!img || img.style.visibility === 'hidden') return;
+    if (!img || img.style.visibility === 'hidden') return false;
     this.dragFrom = sq;
     const rect = img.getBoundingClientRect();
     const ghost = img.cloneNode(true) as HTMLImageElement;
@@ -176,6 +195,7 @@ export class BoardView {
     document.body.appendChild(ghost);
     this.dragGhost = ghost;
     img.style.opacity = '0.35';
+    return true;
   }
 
   private markDropTarget(sq: string | null): void {
@@ -297,11 +317,5 @@ export class BoardView {
   /** 某格是否摆着棋子 */
   hasPiece(sq: SquareName): boolean {
     return this.imgs.get(sq)?.style.visibility === 'visible';
-  }
-
-  /** 校验格子名是否合法 */
-  static validSquare(sq: string): boolean {
-    const { file, rank } = splitSquare(sq);
-    return FILES.includes(file) && rank >= 1 && rank <= 8;
   }
 }

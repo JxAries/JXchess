@@ -1,6 +1,11 @@
 /* JXchess v0.1 全局样式：报纸风（Newspaper）。
    要点：棋盘用极浅两色 + 细线分格而不靠大色块；界面以暖灰纸色为主；
-   只保留一种低饱和深红作为强调色；按钮统一为细边框幽灵样式；全局禁止选中与原生拖图。 */
+   只保留一种低饱和深红作为强调色；按钮统一为细边框幽灵样式；全局禁止选中与原生拖图。
+
+   棋盘配色对齐 lichess 的 Newspaper 主题：两级浅灰 #dcdcdc / #c9c9c9，格线 #939393，
+   深色格里有一组从角部向内辐射的细斜线（刻意不画到格子边缘），形成报纸制版的排线感。
+   这里用 CSS 渐变复刻该排线，不引入 lichess 的素材文件（其仓库为 AGPL-3.0，与本项目 MPL-2.0 不同），
+   因此下面所有数值都是按上述观感自行实现的。 */
 
 :root {
   --paper: #faf8f4;
@@ -10,9 +15,20 @@
   --line: #e3ded5;
   --accent: #8a3b3b;
   --accent-soft: #f6edeb;
-  --sq-light: #fcfbf8;
-  --sq-dark: #f2efe9;
-  --grid: rgba(43, 42, 40, 0.2);
+  /* Newspaper 棋盘三色 */
+  --sq-light: #dcdcdc;
+  --sq-dark: #c9c9c9;
+  --sq-line: #939393;
+  /* 排线间距：period 是 135deg 上的重复周期。值越小排线越密 */
+  --hatch-period: 11%;
+  --hatch-width: 1px;
+  /* 高亮透明度：统一在这里调，避免各处硬编码 */
+  --hl-selected: 0.3;
+  --hl-move-dot: 0.3;
+  --hl-capture-ring: 0.24;
+  --hl-last-move: 0.24;
+  --hl-drop: 0.18;
+  --hl-glow: 0.55;
   --bw: min(calc(100dvh - 210px), 640px);
 }
 
@@ -98,7 +114,8 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 }
 .board-wrap { display: flex; align-items: center; justify-content: center; }
 
-/* 棋盘：极浅两色 + 细线分格 */
+/* 棋盘：Newspaper 主题。浅色格 #dcdcdc，深色格 #c9c9c9，两者同色系细线分格。
+   原版棋盘本身没有边框，只靠投影浮起，圆角 7px。 */
 .board {
   position: relative;
   display: grid;
@@ -106,23 +123,46 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   aspect-ratio: 1;
   width: var(--bw);
   background: var(--sq-light);
-  border: 1px solid var(--line);
+  border: 1px solid var(--sq-line);
+  border-radius: 7px;
   overflow: hidden;
-  box-shadow: 0 1px 14px rgba(43, 42, 40, 0.06);
+  box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.08), 0 3px 1px -2px rgba(0, 0, 0, 0.18), 0 1px 5px 0 rgba(0, 0, 0, 0.1);
   user-select: none;
 }
 
-.sq { position: relative; box-shadow: inset 0 0 0 0.5px var(--grid); }
+.sq { position: relative; }
 .sq.light { background: var(--sq-light); }
 .sq.dark { background: var(--sq-dark); }
+
+/* 深色格中的排线：从角部向内辐射的细斜线，刻意不到边缘。
+   间距由 --hatch-period 控制，调小即更密；线宽即 1px，不随棋盘尺寸变化。
+   层级：排线 0 → 将军红光 1 → 棋子 2 → 选中/落点 3 → 坐标 4，
+   因此任何高亮都不会盖到棋子上。 */
+.sq.dark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0,
+    transparent calc(var(--hatch-period) / 2 - var(--hatch-width)),
+    var(--sq-line) calc(var(--hatch-period) / 2 - var(--hatch-width)),
+    var(--sq-line) calc(var(--hatch-period) / 2 + var(--hatch-width)),
+    transparent calc(var(--hatch-period) / 2 + var(--hatch-width)),
+    transparent var(--hatch-period)
+  );
+}
 
 .sq img.piece {
   position: absolute;
   inset: 0;
+  z-index: 2;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  filter: drop-shadow(0 1px 2px rgba(43, 42, 40, 0.34));
+  filter: drop-shadow(0 1px 2px rgba(43, 42, 40, 0.3));
   transition: transform 0.12s ease;
 }
 .sq:hover img.piece { transform: translateY(-1px); }
@@ -148,51 +188,72 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   transition: transform 190ms ease-in-out;
 }
 
-.sq .coord { position: absolute; font-size: clamp(8px, 1vw, 12px); font-weight: 600; pointer-events: none; }
+.sq .coord { position: absolute; z-index: 4; font-size: clamp(8px, 1vw, 12px); font-weight: 600; pointer-events: none; }
 .sq .coord.rank { top: 2px; left: 4px; }
 .sq .coord.file { bottom: 1px; right: 4px; }
-.sq.light .coord { color: rgba(114, 109, 102, 0.8); }
-.sq.dark .coord { color: rgba(90, 85, 78, 0.85); }
+.sq.light .coord { color: #8d8d8d; }
+.sq.dark .coord { color: #ffffff; }
 
-/* 选中、上一步用描边；将军用一圈由深到浅的暗红圆形底色 */
-.sq.sel { box-shadow: inset 0 0 0 2px var(--accent); }
-.sq.last { box-shadow: inset 0 0 0 2px rgba(43, 42, 40, 0.3); }
-.sq.check::before {
-  content: "";
+/* 状态高亮层：铺满整格，层级 3 —— 高于棋子，因此读数清楚。
+   将军红光单独放在更低的一层（.glow，层级 1），不参与这里的层级。 */
+.sq .hl {
   position: absolute;
-  left: 14%;
-  top: 14%;
-  width: 72%;
-  height: 72%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(138, 59, 59, 0.45) 0%, rgba(138, 59, 59, 0.22) 55%, rgba(138, 59, 59, 0.02) 78%, transparent 82%);
-  pointer-events: none;
-}
-.sq.drop { box-shadow: inset 0 0 0 2px var(--accent); }
-.sq.target::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(138, 59, 59, 0.32) 0 11%, transparent 22%);
-  pointer-events: none;
-}
-.sq.target-capture::after {
-  content: "";
-  position: absolute; inset: 9%;
-  border: 2px solid rgba(138, 59, 59, 0.28);
-  border-radius: 50%;
+  inset: 0;
+  z-index: 3;
   pointer-events: none;
 }
 
-/* 棋盘下的播放控制条，与棋盘等宽 */
+/* 将军红光层：层级 1，低于棋子（层级 2），因此红光落在王的下方，不会遮挡王。
+   只保留光晕，不画红色描边。 */
+.sq .glow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.sq.check .glow {
+  background-image: radial-gradient(circle at center,
+    rgb(200 40 40 / var(--hl-glow)) 0%,
+    rgb(190 40 40 / calc(var(--hl-glow) * 0.45)) 42%,
+    rgb(170 30 30 / 0) 74%);
+}
+
+/* 选中：整格淡绿 */
+.sq.sel .hl { background-color: rgb(20 85 30 / var(--hl-selected)); }
+
+/* 最近一步：整格淡黄绿 */
+.sq.last .hl { background-color: rgb(155 199 0 / var(--hl-last-move)); }
+
+/* 合法落点：中心圆点，半径约格宽的 19–20% */
+.sq.target .hl {
+  background-image: radial-gradient(rgb(20 85 30 / var(--hl-move-dot)) 19%, rgb(0 0 0 / 0) 20%);
+}
+
+/* 可吃子：贴边的细圆环 */
+.sq.target-capture .hl {
+  background-image: radial-gradient(transparent 0%, transparent 79%, rgb(20 85 0 / var(--hl-capture-ring)) 80%);
+}
+
+/* 拖拽悬停的落点：整格淡绿，比选中更淡 */
+.sq.drop .hl { background-color: rgb(20 85 30 / var(--hl-drop)); }
+
+/* 选中与拖拽落点仍保留细描边，但比原先淡 */
+.sq.sel,
+.sq.drop {
+  box-shadow: inset 0 0 0 2px rgba(138, 59, 59, 0.38);
+}
+
+/* 播放控制条：位于右侧面板的按钮组与得子行之间 */
 .ctlbar {
-  width: var(--bw);
-  height: 46px;
+  margin: 0 12px 8px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
+  flex-shrink: 0;
 }
 .ctl {
   width: 36px; height: 36px;
@@ -380,19 +441,6 @@ button.var-line.active .var-move.cur { box-shadow: inset 0 -1px 0 var(--accent);
 .promo-btn:hover { background: var(--accent-soft); }
 .promo-btn img { width: 100%; height: 100%; }
 
-/* 直接双击 HTML 时的提示条 */
-.file-warning {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 99999;
-  background: var(--accent);
-  color: #fff;
-  padding: 10px 18px;
-  text-align: center;
-  font-size: 14px;
-  line-height: 1.7;
-}
-
 /* ---------- 首页 ---------- */
 .home { position: relative; }
 .sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
@@ -449,27 +497,9 @@ button.var-line.active .var-move.cur { box-shadow: inset 0 -1px 0 var(--accent);
   transition: opacity 0.2s ease;
   will-change: transform;
 }
-.fx-king { width: 34px; height: 34px; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.3)); }
-.fx-knight { width: 34px; height: 34px; opacity: 0.95; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.24)); }
-
-/* 指针锁定位置的墙角式标记：一横一竖 */
-.fx-lock {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10000;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-.fx-lock::before,
-.fx-lock::after {
-  content: "";
-  position: absolute;
-  background: var(--accent);
-  border-radius: 1px;
-}
-.fx-lock::before { left: 7px; top: 7px; width: 9px; height: 1.5px; }
-.fx-lock::after { left: 7px; top: 7px; width: 1.5px; height: 9px; }
+/* 王与马同尺寸；马落后固定间距跟随，不再有跳跃与游走动画 */
+.fx-king { width: 40px; height: 40px; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.3)); }
+.fx-knight { width: 40px; height: 40px; opacity: 0.95; filter: drop-shadow(0 2px 3px rgba(43, 42, 40, 0.24)); }
 
 /* ---------- 摆棋页面板 ---------- */
 .palette { flex-shrink: 0; }
