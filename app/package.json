@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "JXchess v0.1 复盘棋盘：PGN 导入、逐步回放、摆棋研究",
+  "description": "JXchess 复盘棋盘：PGN 导入、逐步回放、摆棋研究",
   "author": "谏贤 (JxAries)",
   "scripts": {
     "dev": "vite",

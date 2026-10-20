@@ -11,6 +11,8 @@ const FILES = 'abcdefgh';
 export interface DragHandlers {
   /** 是否允许从该格开始拖拽 */
   canStart(sq: SquareName): boolean;
+  /** 该落点是否合法；只有返回 true 的格子在拖拽时才给悬停高亮 */
+  canDrop(from: SquareName, to: SquareName): boolean;
   /** 拖到目标格时回调 */
   onDrop(from: SquareName, to: SquareName): void;
   /** 进入拖拽时回调，供页面亮出该子的全部合法落点 */
@@ -198,9 +200,16 @@ export class BoardView {
     return true;
   }
 
+  /**
+   * 标记拖拽悬停的落点：只有该子确实能走到这一格时才添加 .drop。
+   * 早先只判断"指针下面有没有格子"，于是拖到任何格子都会亮，
+   * 包括吃不到的子、走不到的格，用户看到的提示与规则不符。
+   */
   private markDropTarget(sq: string | null): void {
+    const from = this.dragFrom;
+    const legal = sq && from ? (this.drag?.canDrop(from, sq) ?? false) : false;
     for (const cell of this.cells.values()) cell.classList.remove('drop');
-    if (sq) this.cells.get(sq)?.classList.add('drop');
+    if (sq && legal) this.cells.get(sq)?.classList.add('drop');
   }
 
   private cleanupDrag(): void {

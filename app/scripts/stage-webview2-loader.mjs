@@ -25,7 +25,7 @@ import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-const projectRoot = join(here, '..');              // v0.1/
+const projectRoot = join(here, '..');              // app/
 const srcTauri = join(projectRoot, 'src-tauri');
 const targetDir = join(srcTauri, 'target', 'release');
 

@@ -39,6 +39,9 @@ export class BoardInput {
         const piece = this.state.chessNow().get(sq as Square);
         return Boolean(piece && piece.color === this.state.chessNow().turn());
       },
+      // 悬停高亮只给合法格：拖到不合法格子上不再有任何提示
+      canDrop: (from, to) =>
+        this.state.legalMovesFrom(from as Square).some((t) => t.to === to),
       onDrop: (from, to) => void this.tryMove(from, to),
       // 起拖时亮出这个子的全部合法落点，拖拽过程中就能看清能放到哪
       onDragStart: (from) => {

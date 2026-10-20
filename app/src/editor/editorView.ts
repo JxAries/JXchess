@@ -37,6 +37,8 @@ export class BoardEditor {
   bindDrag(handler: (from: SquareName, to: SquareName) => void, canStart?: () => boolean): void {
     this.board.setDragHandlers({
       canStart: (sq) => (canStart ? canStart() : true) && Boolean(this.getAt(sq)),
+      // 摆棋没有走法规则：任何别的格子都是合法落点（落到已有棋子的格子即覆盖）
+      canDrop: (from, to) => from !== to,
       onDrop: handler,
     });
   }

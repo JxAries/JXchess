@@ -32,15 +32,19 @@ const btnDeleteBranch = must<HTMLButtonElement>('btn-delete-branch');
 const board = new BoardView(boardWrap);
 const sfx = new SoundFX();
 let flipped = false;
-let noteTimer = 0;
 
-/** 在棋谱面板内短暂显示一行提示，替代浮动弹窗 */
+/**
+ * 在棋谱面板内显示一行提示，替代浮动弹窗。
+ * 刻意不设定时清除：错误信息（PGN 解析失败、非法 FEN、走法不合法等）要一直留在面板上，
+ * 方便用户看清原因；它会被下一条提示替换，或在用户完成一次成功的导入/走子后清掉。
+ */
 function showNote(message: string): void {
   panelNote.textContent = message;
-  window.clearTimeout(noteTimer);
-  noteTimer = window.setTimeout(() => {
-    panelNote.textContent = '';
-  }, 2800);
+}
+
+/** 清掉面板内的提示行（该行没有内容时不会占位） */
+function clearNote(): void {
+  panelNote.textContent = '';
 }
 
 // 支持从摆棋页带着局面跳转过来
@@ -130,7 +134,11 @@ function refresh(play: MovePlayed | null): void {
 function loadPgnText(text: string): void {
   const error = state.loadPgn(text);
   if (error) showNote(error);
-  else refresh(null);
+  else {
+    // 导入成功：清掉上一次残留的错误提示
+    clearNote();
+    refresh(null);
+  }
 }
 
 function downloadPgn(): void {
@@ -147,7 +155,11 @@ function downloadPgn(): void {
 
 // 棋盘交互：点击与拖拽均在此触发刷新
 new BoardInput(board, state, {
-  onChanged: (move) => refresh(move),
+  onChanged: (move) => {
+    // 走出一步合法着法即视为已恢复正常，清掉之前残留的错误提示
+    clearNote();
+    refresh(move);
+  },
   onMessage: showNote,
   // 拖拽中途松手（或落到非法格）时，把棋盘恢复成常规高亮
   onDragEnd: () => refresh(null),

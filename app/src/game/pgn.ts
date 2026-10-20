@@ -1,7 +1,7 @@
 /**
  * PGN 棋谱的解析与导出。
  * parsePgn 校验文本并把对局拆成开局 FEN、头部信息与 SAN 走法列表；
- * exportPgn 由起点 FEN 与走法列表重建 PGN 文本；replay 用于只读回放得到某一步的局面。
+ * exportPgn 由起点 FEN 与走法列表重建 PGN 文本。
  */
 import { Chess } from 'chess.js';
 

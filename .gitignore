@@ -8,8 +8,8 @@ ignore/
 # 我们自己测试用的免安装 exe 与安装包都不进仓库；正式发布走 GitHub Releases。
 # 注意不要写成全局 *.exe，否则会误伤 ignore/ 之外将来可能需要的脚本。
 release/
-v0.1/release/
-v0.1/src-tauri/target/
+app/release/
+app/src-tauri/target/
 
 # ---- Node / 前端工程 ----
 node_modules/

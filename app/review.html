@@ -39,14 +39,15 @@
           <button id="btn-new-branch" class="btn" type="button" title="在当前位置新建一条支线，接着走一步即进入该支线">新建分支</button>
           <button id="btn-delete-branch" class="btn" type="button" title="删除当前所在的支线">删除分支</button>
         </div>
-        <!-- 播放控制：紧跟在按钮组下方、得子行上方，不再单独占棋盘下的一行 -->
+        <!-- 提示行：位于按钮组与播放控制条之间，常驻显示到下一次操作或新提示，便于用户读清错误原因 -->
+        <p class="panel-note" id="panel-note"></p>
+        <!-- 播放控制：紧跟在提示行下方、得子行上方，不再单独占棋盘下的一行 -->
         <div class="ctlbar" id="ctlbar">
           <button id="btn-start" class="ctl" type="button" title="回到开局">⏮</button>
           <button id="btn-prev" class="ctl" type="button" title="上一步">◀</button>
           <button id="btn-next" class="ctl" type="button" title="下一步">▶</button>
           <button id="btn-end" class="ctl" type="button" title="跳到终局">⏭</button>
         </div>
-        <p class="panel-note" id="panel-note"></p>
         <div class="cap-row" id="cap-white" title="白方得子"></div>
         <div class="cap-row" id="cap-black" title="黑方得子"></div>
         <div class="move-list" id="move-list"></div>
