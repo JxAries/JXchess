@@ -1,4 +1,4 @@
-# JXchess
+# JXchess   ![Assisted by DeepSeek](https://img.shields.io/badge/Assisted%20by-DeepSeek-00a67d?logo=deepseek)
 
 面向中文棋手的开源免费国际象棋工具。0.x 阶段做单机学棋工具，从复盘与摆棋做起；引擎分析、揭棋与盲棋、账号在后续版本，联网功能安排在 1.x。
 
@@ -14,8 +14,6 @@
 发布后如需修 bug，会以 0.1.1 这类小版本单独发布。
 
 Windows 10 / 11，无需预先安装任何运行环境。安装包内置了 WebView2 运行时的引导程序，若系统缺少会自动补装（这一步需要联网）；免安装版依赖系统已有的 WebView2 运行时。安装包未做代码签名，首次运行若出现系统的"未知发布者"提示，选择继续运行即可。
-
-> 仓库源码里不含可执行文件，打包产物输出在 `app/src-tauri/target/` 与 `app/release/`，两者都已加入 `.gitignore`。
 
 ## 功能
 
