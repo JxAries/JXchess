@@ -21,9 +21,19 @@ export type PlayResult =
   | { ok: true; san: string; isVariation: boolean }
   | { ok: false; error: string };
 
-/** 棋谱面板用小字变例：tokens 为按回合排版的片段，activeStep 标示光标在链上的位置 */
-export interface VariationView {
-  tokens: string[];
+/** 变例中的一步：供棋谱逐行渲染（主线每步一行、分支也每步一行） */
+export interface VariationMove {
+  san: string;
+  moveNumber: number;
+  side: 'w' | 'b';
+  /** 在该支线内的序号（0 起），用于点击跳到对应步 */
+  step: number;
+}
+
+/** 棋谱面板用的一条变例：按步拆开，activeStep 标示光标在这条支线的位置 */
+export interface VariationLine {
+  index: number;
+  moves: VariationMove[];
   active: boolean;
   activeStep: number;
 }
@@ -167,10 +177,10 @@ export class ReviewState {
   }
 
   /**
-   * 某主线行下已有的变例，每项包含按“回合数 + 着法”排版后的文本片段。
-   * 白方开始的变例写成 1.e6 f5 这样的形式；黑方开始的写成 1.… e5 形式。
+   * 某主线行下已有的变例，按“每步一条”返回结构化数据，供棋谱逐行渲染。
+   * 第 row 行表示“主线走了 row 步之后”的位置；row=0 即开局前。
    */
-  variationsOfRow(row: number): VariationView[] {
+  variationLines(row: number): VariationLine[] {
     const main = this.mainPath();
     const holder = row <= 0 ? this.root : main[row - 1];
     if (!holder) return [];
@@ -183,29 +193,51 @@ export class ReviewState {
       base.move({ from: step.from, to: step.to, promotion: step.promotion });
     }
 
-    const views: VariationView[] = [];
+    const lines: VariationLine[] = [];
     holder.children.forEach((child, i) => {
       if (i === 0) return;
       const lineChess = new Chess(base.fen());
-      const tokens: string[] = [];
+      const moves: VariationMove[] = [];
       let node: TreeNode | null = child;
-      let first = true;
+      let step = 0;
       while (node) {
-        tokens.push(formatToken(lineChess, node.san, first));
+        moves.push({
+          san: node.san,
+          moveNumber: lineChess.moveNumber(),
+          side: lineChess.turn(),
+          step,
+        });
         lineChess.move({ from: node.from, to: node.to, promotion: node.promotion });
-        first = false;
         node = node.children[0];
+        step += 1;
       }
-      const index = views.length;
+      const index = lines.length;
       const isActive = Boolean(anchor && anchor.row === row && anchor.index === index);
-      const start = child;
-      views.push({
-        tokens,
+      lines.push({
+        index,
+        moves,
         active: isActive,
-        activeStep: isActive ? this.stepWithin(start, this.cursor) : -1,
+        activeStep: isActive ? this.stepWithin(child, this.cursor) : -1,
       });
     });
-    return views;
+    return lines;
+  }
+
+  /** 跳到某条第 row 行变例的第 step 步；越界时停在末端 */
+  goVariationStep(row: number, index: number, step: number): void {
+    const start = this.variationStart(row, index);
+    if (!start) return;
+    this.branchArmed = false;
+    let node = start;
+    for (let i = 0; i < step && node.children[0]; i++) node = node.children[0];
+    this.cursor = node;
+  }
+
+  /** 对局双方名字：优先取 PGN 头部，缺省为“白方/黑方” */
+  players(): { white: string; black: string } {
+    const white = (this.meta.White ?? '').trim();
+    const black = (this.meta.Black ?? '').trim();
+    return { white: white || '白方', black: black || '黑方' };
   }
 
   /** 切换“新建支线”预设状态，返回切换后的值 */
@@ -448,12 +480,4 @@ export class ReviewState {
     const sans = this.mainPath().map((n) => n.san);
     return exportPgn(this.startFen, sans, this.meta);
   }
-}
-
-/** 把一个着法片段排版成 1.e4 / 1.… e5 / 后续着法 的文本形式 */
-function formatToken(chess: Chess, san: string, first: boolean): string {
-  const turn = chess.turn();
-  const num = chess.moveNumber();
-  if (turn === 'w') return `${num}.${san}`;
-  return first ? `${num}.… ${san}` : san;
 }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- 首页：logo 居中，标题在下，入口按钮分列两侧；背景棋子由脚本随机生成并缓缓飘落，鼠标为棋子跟随效果。 -->
+<!-- 首页：logo 与标题居中，下方三张入口卡片（复盘 / 摆棋 / 对弈）；
+     背景棋子由脚本随机生成并缓缓飘落，鼠标为棋子跟随效果。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -13,23 +14,31 @@
   <div class="sky" aria-hidden="true"></div>
 
   <main class="home-stage">
-    <a class="entry flank left" href="./review.html">
-      <img src="./pieces/wK.svg" alt="" width="46" height="46" draggable="false" />
-      <span class="entry-name">复盘</span>
-      <span class="entry-desc">导入棋谱，逐步回放</span>
-    </a>
-
     <div class="home-center">
       <div class="home-logo"><img src="./logo.svg" alt="JXchess logo" width="150" height="150" draggable="false" /></div>
       <h1 class="home-title">JXchess</h1>
       <p class="home-sub">开源免费的国际象棋工具</p>
     </div>
 
-    <a class="entry flank right" href="./editor.html">
-      <img src="./pieces/wB.svg" alt="" width="46" height="46" draggable="false" />
-      <span class="entry-name">摆棋</span>
-      <span class="entry-desc">自由摆放，研究局面</span>
-    </a>
+    <div class="home-entries">
+      <a class="entry" href="./review.html">
+        <img src="./pieces/wK.svg" alt="" width="46" height="46" draggable="false" />
+        <span class="entry-name">复盘</span>
+        <span class="entry-desc">导入棋谱，逐步回放</span>
+      </a>
+
+      <a class="entry" href="./editor.html">
+        <img src="./pieces/wB.svg" alt="" width="46" height="46" draggable="false" />
+        <span class="entry-name">摆棋</span>
+        <span class="entry-desc">自由摆放，研究局面</span>
+      </a>
+
+      <a class="entry" href="./play.html">
+        <img src="./pieces/wN.svg" alt="" width="46" height="46" draggable="false" />
+        <span class="entry-name">对弈</span>
+        <span class="entry-desc">与本地 Stockfish 对弈</span>
+      </a>
+    </div>
   </main>
 
   <script type="module" src="./src/pages/home.ts"></script>

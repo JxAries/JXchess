@@ -1,12 +1,16 @@
 /**
- * 通用文本输入弹窗：复盘页粘贴 PGN、摆棋页输入 FEN 等场景共用。
+ * 通用文本输入弹窗：复盘页导入 PGN、摆棋页输入 FEN 等场景共用。
  * openTextDialog 打开弹窗并返回 Promise，确认时得到文本，取消时返回 null。
+ * 可选 fileButton：在弹窗左下角放一个「打开文件」按钮，把选中的文件内容填进文本框
+ * （复盘页的「导入棋谱」就是用它把「打开文件」和「粘贴棋谱」二合一）。
  */
 export interface DialogOptions {
   title: string;
   placeholder?: string;
   confirmText?: string;
   rows?: number;
+  /** 左下角的附加按钮：返回文件文本（null 表示用户取消） */
+  fileButton?: { label: string; onPick: () => Promise<string | null> };
 }
 
 export function openTextDialog(opts: DialogOptions): Promise<string | null> {
@@ -28,6 +32,22 @@ export function openTextDialog(opts: DialogOptions): Promise<string | null> {
 
     const row = document.createElement('div');
     row.className = 'row';
+    if (opts.fileButton) {
+      const attach = document.createElement('button');
+      attach.type = 'button';
+      attach.className = 'btn attach';
+      attach.textContent = opts.fileButton.label;
+      attach.addEventListener('click', async () => {
+        attach.disabled = true;
+        try {
+          const text = await opts.fileButton!.onPick();
+          if (text) textarea.value = text;
+        } finally {
+          attach.disabled = false;
+        }
+      });
+      row.appendChild(attach);
+    }
     const cancel = document.createElement('button');
     cancel.type = 'button';
     cancel.className = 'btn';

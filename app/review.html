@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- 复盘页：棋盘居中，右侧棋谱面板；播放控制与导入导出都在面板内，棋盘下方不再留控制条。 -->
+<!-- 复盘页：左侧分析面板、中间棋盘（右侧评估条、上下得子）、右侧棋谱面板。
+     窄屏（<1180px）时左面板收进抽屉，点顶栏「分析」展开。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -20,37 +21,153 @@
       <a class="nav-link" href="./editor.html">摆棋</a>
     </nav>
     <div class="spacer"></div>
+    <button id="btn-analysis-drawer" class="btn drawer-toggle" type="button" title="展开分析面板">分析</button>
   </header>
 
-  <main class="main">
-    <div class="board-stage">
-      <div class="board-wrap" id="board-wrap"></div>
-    </div>
+  <main class="main review-main" id="review-main">
+    <!-- 左侧：分析面板 -->
+    <aside class="side side-left" id="side-left">
+      <div class="panel analysis-panel">
+        <div class="panel-head">分析</div>
 
-    <aside class="side">
+        <div class="analysis-body" id="analysis-body">
+          <!-- 引擎一选 / 二选 -->
+          <div class="engine-lines">
+            <div class="engine-line">
+              <span class="engine-rank">1</span>
+              <span class="engine-score" id="engine-score-1">—</span>
+              <span class="engine-pv" id="engine-pv-1">未分析</span>
+            </div>
+            <div class="engine-line">
+              <span class="engine-rank">2</span>
+              <span class="engine-score" id="engine-score-2">—</span>
+              <span class="engine-pv" id="engine-pv-2">未分析</span>
+            </div>
+          </div>
+
+          <!-- 图表：默认局面走势，可切换用时 -->
+          <div class="chart-card">
+            <div class="chart-head">
+              <span id="chart-title">局面走势</span>
+              <button id="btn-chart-toggle" class="chart-toggle" type="button" title="切换为用时分析">⇄</button>
+            </div>
+            <div class="chart-body" id="chart-body">
+              <svg class="chart-svg chart-line" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="0" y="0" width="100" height="30" fill="#f3f1ec" />
+                <rect x="0" y="30" width="100" height="30" fill="#3a3936" />
+                <line x1="0" y1="30" x2="100" y2="30" stroke="#d9d4ca" stroke-width="0.4" />
+                <path d="M0,30 L100,30" fill="none" stroke="#8a3b3b" stroke-width="1" />
+              </svg>
+              <svg class="chart-svg chart-bars" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
+                <line x1="0" y1="58" x2="100" y2="58" stroke="#d9d4ca" stroke-width="0.4" />
+                <g fill="#b9b1a4">
+                  <rect x="2" y="42" width="3" height="16" />
+                  <rect x="6" y="34" width="3" height="24" />
+                  <rect x="10" y="46" width="3" height="12" />
+                  <rect x="14" y="30" width="3" height="28" />
+                  <rect x="18" y="44" width="3" height="14" />
+                  <rect x="22" y="38" width="3" height="20" />
+                  <rect x="26" y="48" width="3" height="10" />
+                  <rect x="30" y="36" width="3" height="22" />
+                  <rect x="34" y="42" width="3" height="16" />
+                  <rect x="38" y="32" width="3" height="26" />
+                  <rect x="42" y="45" width="3" height="13" />
+                  <rect x="46" y="40" width="3" height="18" />
+                  <rect x="50" y="47" width="3" height="11" />
+                  <rect x="54" y="35" width="3" height="23" />
+                  <rect x="58" y="43" width="3" height="15" />
+                  <rect x="62" y="39" width="3" height="19" />
+                  <rect x="66" y="49" width="3" height="9" />
+                  <rect x="70" y="37" width="3" height="21" />
+                  <rect x="74" y="44" width="3" height="14" />
+                  <rect x="78" y="33" width="3" height="25" />
+                  <rect x="82" y="46" width="3" height="12" />
+                  <rect x="86" y="41" width="3" height="17" />
+                  <rect x="90" y="48" width="3" height="10" />
+                  <rect x="94" y="36" width="3" height="22" />
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <!-- 双方统计 -->
+          <div class="stats-card">
+            <section class="stats-side" data-side="white">
+              <div class="stats-player">
+                <span class="player-dot"></span>
+                <span class="player-name" id="player-white">白方</span>
+              </div>
+              <div class="stats-row"><span class="mark mark-brilliant">!!</span><span class="mark-label">妙手</span><span class="stats-count" data-kind="brilliant">–</span></div>
+              <div class="stats-row"><span class="mark mark-good">!</span><span class="mark-label">好棋</span><span class="stats-count" data-kind="good">–</span></div>
+              <div class="stats-row"><span class="mark mark-best">★</span><span class="mark-label">最佳</span><span class="stats-count" data-kind="best">–</span></div>
+              <div class="stats-row"><span class="mark mark-normal">·</span><span class="mark-label">一般</span><span class="stats-count" data-kind="normal">–</span></div>
+              <div class="stats-row"><span class="mark mark-inaccuracy">?!</span><span class="mark-label">不精确</span><span class="stats-count" data-kind="inaccuracy">–</span></div>
+              <div class="stats-row"><span class="mark mark-mistake">?</span><span class="mark-label">失误</span><span class="stats-count" data-kind="mistake">–</span></div>
+              <div class="stats-row"><span class="mark mark-blunder">??</span><span class="mark-label">严重失误</span><span class="stats-count" data-kind="blunder">–</span></div>
+              <div class="stats-accuracy"><span>准确度</span><span data-kind="accuracy">–</span></div>
+              <div class="stats-accuracy"><span>ACPL</span><span data-kind="acpl">–</span></div>
+            </section>
+            <section class="stats-side" data-side="black">
+              <div class="stats-player">
+                <span class="player-dot black"></span>
+                <span class="player-name" id="player-black">黑方</span>
+              </div>
+              <div class="stats-row"><span class="mark mark-brilliant">!!</span><span class="mark-label">妙手</span><span class="stats-count" data-kind="brilliant">–</span></div>
+              <div class="stats-row"><span class="mark mark-good">!</span><span class="mark-label">好棋</span><span class="stats-count" data-kind="good">–</span></div>
+              <div class="stats-row"><span class="mark mark-best">★</span><span class="mark-label">最佳</span><span class="stats-count" data-kind="best">–</span></div>
+              <div class="stats-row"><span class="mark mark-normal">·</span><span class="mark-label">一般</span><span class="stats-count" data-kind="normal">–</span></div>
+              <div class="stats-row"><span class="mark mark-inaccuracy">?!</span><span class="mark-label">不精确</span><span class="stats-count" data-kind="inaccuracy">–</span></div>
+              <div class="stats-row"><span class="mark mark-mistake">?</span><span class="mark-label">失误</span><span class="stats-count" data-kind="mistake">–</span></div>
+              <div class="stats-row"><span class="mark mark-blunder">??</span><span class="mark-label">严重失误</span><span class="stats-count" data-kind="blunder">–</span></div>
+              <div class="stats-accuracy"><span>准确度</span><span data-kind="accuracy">–</span></div>
+              <div class="stats-accuracy"><span>ACPL</span><span data-kind="acpl">–</span></div>
+            </section>
+          </div>
+
+          <!-- 预留：AI 讲棋 -->
+          <div class="ai-card"><span>AI 讲棋 · 开发中</span></div>
+        </div>
+
+        <!-- 未分析时的蒙版 -->
+        <div class="analysis-mask" id="analysis-mask">
+          <button class="btn primary" id="btn-analyze" type="button">分析本局</button>
+          <p class="analysis-hint">引擎将在后续版本接入</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中间：棋盘 + 评估条 + 上下得子 -->
+    <section class="board-stage">
+      <div class="cap-strip" id="cap-top" aria-hidden="true"></div>
+      <div class="board-with-eval">
+        <div class="board-wrap" id="board-wrap"></div>
+        <div class="evalbar" id="evalbar" aria-label="局面评估"></div>
+      </div>
+      <div class="cap-strip" id="cap-bottom" aria-hidden="true"></div>
+    </section>
+
+    <!-- 右侧：棋谱面板 -->
+    <aside class="side side-right">
       <div class="panel movepanel">
         <div class="panel-head">棋谱</div>
         <div class="panel-tools">
           <input id="file-picker" type="file" accept=".pgn,.txt,application/x-chess-pgn" hidden />
-          <button id="btn-open-file" class="btn" type="button" title="从本机选择 PGN 文件">打开文件</button>
-          <button id="btn-import" class="btn" type="button" title="粘贴 PGN 文本">粘贴棋谱</button>
+          <button id="btn-import" class="btn" type="button" title="打开本机 PGN 文件，或粘贴 PGN 文本">导入棋谱</button>
           <button id="btn-export" class="btn" type="button" title="导出当前对局为 PGN 文件">导出 PGN</button>
-          <button id="btn-flip" class="btn" type="button" title="翻转棋盘">翻转棋盘</button>
+          <button id="btn-engine-settings" class="btn" type="button" title="线程、内存、深度等引擎参数">引擎设置</button>
           <button id="btn-new-branch" class="btn" type="button" title="在当前位置新建一条支线，接着走一步即进入该支线">新建分支</button>
           <button id="btn-delete-branch" class="btn" type="button" title="删除当前所在的支线">删除分支</button>
+          <button id="btn-display-settings" class="btn" type="button" title="评估条、箭头、标记等显示项">显示设置</button>
         </div>
-        <!-- 提示行：位于按钮组与播放控制条之间，常驻显示到下一次操作或新提示，便于用户读清错误原因 -->
         <p class="panel-note" id="panel-note"></p>
-        <!-- 播放控制：紧跟在提示行下方、得子行上方，不再单独占棋盘下的一行 -->
+        <div class="move-list" id="move-list"></div>
         <div class="ctlbar" id="ctlbar">
           <button id="btn-start" class="ctl" type="button" title="回到开局">⏮</button>
           <button id="btn-prev" class="ctl" type="button" title="上一步">◀</button>
+          <button id="btn-flip" class="ctl" type="button" title="翻转棋盘">⟳</button>
           <button id="btn-next" class="ctl" type="button" title="下一步">▶</button>
           <button id="btn-end" class="ctl" type="button" title="跳到终局">⏭</button>
         </div>
-        <div class="cap-row" id="cap-white" title="白方得子"></div>
-        <div class="cap-row" id="cap-black" title="黑方得子"></div>
-        <div class="move-list" id="move-list"></div>
       </div>
     </aside>
   </main>

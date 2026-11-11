@@ -19,6 +19,7 @@ export default defineConfig({
         index: 'index.html',
         review: 'review.html',
         editor: 'editor.html',
+        play: 'play.html',
       },
     },
   },
