@@ -39,6 +39,7 @@ export function renderMoveList(el: HTMLElement, state: ReviewState, cb: MoveCall
     btn.addEventListener('click', () => cb.goToNode(ply.id));
     const score = document.createElement('span');
     score.className = 'ply-score';
+    score.dataset.fen = ply.fen;
     wrap.append(btn, score);
     return wrap;
   };

@@ -45,7 +45,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   extraArrows: false,
   annotations: true,
   moveScores: true,
-  autoAnalyze: false,
+  autoAnalyze: true,
   evalFollowFlip: true,
 };
 

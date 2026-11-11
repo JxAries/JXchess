@@ -30,11 +30,6 @@ function tauri(): TauriGlobal | null {
   return window.__TAURI__ ?? null;
 }
 
-/** 当前是否运行在桌面版（浏览器预览时为 false） */
-export function isDesktop(): boolean {
-  return tauri() !== null;
-}
-
 async function ensureListening(): Promise<void> {
   const api = tauri();
   if (!api || listening) return;

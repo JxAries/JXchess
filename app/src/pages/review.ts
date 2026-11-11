@@ -11,7 +11,8 @@ import { renderMoveList } from '../panels/moveList';
 import { openAlert, openTextDialog } from '../panels/dialog';
 import { openDisplaySettings, openEngineSettings } from '../panels/settingsDialog';
 import { EvalBar } from '../panels/evalBar';
-import { isDesktop, shutdownEngine, startEngine } from '../engine/client';
+import { AnalysisController, formatScore, pvToSan, type EngineLine } from '../engine/analysis';
+import { shutdownEngine } from '../engine/client';
 import { loadDisplay, type DisplaySettings } from '../settings';
 import { SoundFX } from '../effects/sound';
 import { pieceImage, type PieceKind } from '../game/types';
@@ -39,6 +40,11 @@ const chartTitle = must('chart-title');
 const btnChartToggle = must<HTMLButtonElement>('btn-chart-toggle');
 const playerWhite = must('player-white');
 const playerBlack = must('player-black');
+const engineScore1 = must('engine-score-1');
+const enginePv1 = must('engine-pv-1');
+const engineScore2 = must('engine-score-2');
+const enginePv2 = must('engine-pv-2');
+const analysisMask = must('analysis-mask');
 
 const board = new BoardView(boardWrap);
 const evalBar = new EvalBar(must('evalbar'));
@@ -46,6 +52,36 @@ const sfx = new SoundFX();
 let flipped = false;
 let display: DisplaySettings = loadDisplay();
 let timingView = false;
+
+/** 引擎分析结果 → 评估条、左侧两条主变、棋谱每步评分 */
+const analysis = new AnalysisController((result) => {
+  evalBar.setScore({ cp: result.cp, mate: result.mate });
+  analysisMask.classList.add('hidden');
+  paintEngineLine(result.lines[0], engineScore1, enginePv1, result.fen);
+  paintEngineLine(result.lines[1], engineScore2, enginePv2, result.fen);
+  paintMoveScores();
+});
+
+/** 填充左侧一条引擎推荐 */
+function paintEngineLine(line: EngineLine | undefined, scoreEl: HTMLElement, pvEl: HTMLElement, fen: string): void {
+  if (!line) {
+    scoreEl.textContent = '—';
+    pvEl.textContent = '未分析';
+    return;
+  }
+  scoreEl.textContent = formatScore(line.cp, line.mate) || '—';
+  pvEl.textContent = pvToSan(fen, line.pv) || line.pv.join(' ');
+}
+
+/** 用已算过的局面分填棋谱每步右侧的评分 */
+function paintMoveScores(): void {
+  moveListEl.querySelectorAll<HTMLElement>('.ply-score').forEach((el) => {
+    const fen = el.dataset.fen;
+    if (!fen) return;
+    const text = analysis.scoreFor(fen);
+    if (text) el.textContent = text;
+  });
+}
 
 /**
  * 错误与提示统一用弹窗输出：之前塞在棋谱面板里的一行小字位置太隐蔽，
@@ -153,6 +189,14 @@ function refresh(play: MovePlayed | null): void {
   renderCaptured();
   renderResult();
   updateBranchButtons();
+  paintMoveScores();
+
+  // 逐手分析默认开启：每换一个局面就从浅到深重新算
+  if (display.autoAnalyze && window.__TAURI__) {
+    void analysis.analyze(chess.fen()).catch(() => {
+      // 引擎启动失败时保持界面可用，错误在用户点“分析本局”时提示
+    });
+  }
 }
 
 function loadPgnText(text: string): void {
@@ -238,15 +282,23 @@ must('btn-import').addEventListener('click', async () => {
 });
 must('btn-export').addEventListener('click', downloadPgn);
 
-// 设置入口：P1 先保存到本地，引擎参数在 P2 接到 Rust 侧
+// 设置入口：显示项即时生效；引擎参数在引擎已启动时直接下发
 must('btn-display-settings').addEventListener('click', () => {
   openDisplaySettings((next) => {
     display = next;
     applyDisplaySettings();
+    if (!display.autoAnalyze) {
+      void analysis.stop();
+    } else if (window.__TAURI__) {
+      void analysis.analyze(state.chessNow().fen()).catch(() => undefined);
+    }
   });
 });
 must('btn-engine-settings').addEventListener('click', () => {
-  openEngineSettings(() => showNote('引擎设置已保存，接入引擎后生效。'));
+  openEngineSettings(() => {
+    void analysis.applySettings();
+    showNote('引擎设置已保存。');
+  });
 });
 
 // 支线管理：新建支线是“待命”开关，删除支线仅在支线内生效
@@ -260,17 +312,13 @@ btnDeleteBranch.addEventListener('click', () => {
   refresh(null);
 });
 
-// 分析面板：P2 先打通“启动本地引擎并读取版本”，分析计算下一步接入
+// 分析本局：从浅到深重新跑当前局面（逐手分析本身已默认开启）
 btnAnalyze.addEventListener('click', async () => {
-  if (!isDesktop()) {
-    showNote('引擎分析仅在桌面版可用；浏览器预览里只展示界面。');
-    return;
-  }
   btnAnalyze.disabled = true;
-  btnAnalyze.textContent = '正在启动…';
+  btnAnalyze.textContent = '分析中…';
   try {
-    const name = await startEngine();
-    showNote(`本地引擎已就绪：${name}。逐手分析将在下一步接入。`);
+    analysisMask.classList.remove('hidden');
+    await analysis.restart(state.chessNow().fen());
   } catch (error) {
     showNote(`引擎启动失败：${error instanceof Error ? error.message : String(error)}`);
   } finally {

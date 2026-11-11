@@ -29,6 +29,8 @@ export interface PlyInfo {
   moveNumber: number;
   side: 'w' | 'b';
   current: boolean;
+  /** 走完这一步之后的局面，用于按局面查评分 */
+  fen: string;
 }
 
 /** 一条变例：anchorId 表示它是在哪一步之后的局面里走出来的（0 表示开局前） */
@@ -191,9 +193,12 @@ export class ReviewState {
           moveNumber: chess.moveNumber(),
           side: chess.turn(),
           current: node === this.cursor,
+          fen: '',
         };
         plies.push(info);
         chess.move({ from: node.from, to: node.to, promotion: node.promotion });
+        // move 之后再取 FEN：这一步之后的局面
+        info.fen = chess.fen();
 
         // 走完这一步之后出现的其它选择，就是下一层变例
         for (let i = 1; i < node.children.length; i++) {
