@@ -71,3 +71,48 @@ export function openTextDialog(opts: DialogOptions): Promise<string | null> {
     }
   });
 }
+
+/**
+ * 简单提示弹窗：只有一个“知道了”按钮，适合展示错误信息。
+ * 之前错误是塞在棋谱面板里的一行小字，位置不显眼；改成弹窗后用户第一眼就能看到。
+ * 点遮罩或按 Esc 也可关闭。
+ */
+export function openAlert(title: string, message: string): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'mask';
+
+  const dialog = document.createElement('div');
+  dialog.className = 'dialog alert-dialog';
+
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  const text = document.createElement('p');
+  text.className = 'alert-message';
+  text.textContent = message;
+
+  const row = document.createElement('div');
+  row.className = 'row';
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.className = 'btn primary';
+  ok.textContent = '知道了';
+  row.appendChild(ok);
+
+  dialog.append(heading, text, row);
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  ok.focus();
+
+  const close = (): void => {
+    overlay.remove();
+    window.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' || e.key === 'Enter') close();
+  };
+  ok.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  window.addEventListener('keydown', onKey);
+}

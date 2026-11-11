@@ -1,7 +1,10 @@
 /**
- * 评估条：位于棋盘右侧，白方在上、黑方在下，零点居中；条内两行文字：
- * 第一行是局面描述（白方胜势 / 白方大优 / 白方略优 / 均势 …），第二行是分值（+1.2 / M5）。
- * 翻转棋盘时白黑两段与文字整体跟随翻转。
+ * 评估条：位于棋盘右侧，与棋盘等高。
+ * 方向与棋盘一致——默认白方在下、黑方在上；翻转棋盘后整条跟着翻。
+ * 文字不再固定在正中：
+ *   - 均势：居中显示；
+ *   - 白方占优：贴到白色段的外端；黑方占优：贴到黑色段的外端；
+ *   - 文字用与所在色段相反的颜色，避免被黑白底色吞掉。
  * P1 阶段先提供静态“均势”，P3 接入引擎后由 setScore 驱动。
  */
 export interface EvalScore {
@@ -15,9 +18,11 @@ export class EvalBar {
   readonly root: HTMLElement;
   private readonly whiteEl: HTMLElement;
   private readonly blackEl: HTMLElement;
+  private readonly textEl: HTMLElement;
   private readonly stateEl: HTMLElement;
   private readonly scoreEl: HTMLElement;
   private score: EvalScore = { cp: 0 };
+  private flipped = false;
 
   constructor(container: HTMLElement) {
     this.root = container;
@@ -28,15 +33,15 @@ export class EvalBar {
     this.blackEl = document.createElement('div');
     this.blackEl.className = 'evalbar-black';
 
-    const text = document.createElement('div');
-    text.className = 'evalbar-text';
+    this.textEl = document.createElement('div');
+    this.textEl.className = 'evalbar-text';
     this.stateEl = document.createElement('span');
     this.stateEl.className = 'evalbar-state';
     this.scoreEl = document.createElement('span');
     this.scoreEl.className = 'evalbar-score';
-    text.append(this.stateEl, this.scoreEl);
+    this.textEl.append(this.stateEl, this.scoreEl);
 
-    this.root.append(this.whiteEl, this.blackEl, text);
+    this.root.append(this.whiteEl, this.blackEl, this.textEl);
     this.render();
   }
 
@@ -48,6 +53,7 @@ export class EvalBar {
 
   /** 棋盘翻转时同步翻转评估条方向 */
   setFlipped(flipped: boolean): void {
+    this.flipped = flipped;
     this.root.classList.toggle('flipped', flipped);
     this.render();
   }
@@ -56,8 +62,31 @@ export class EvalBar {
     const pct = this.whitePercent();
     // 避免某一段完全消失，留出 1% 的可见边
     this.whiteEl.style.height = `${Math.min(99, Math.max(1, pct))}%`;
+
+    const lead = this.leadingSide();
+    this.textEl.className = `evalbar-text pos-${this.textPosition(lead)} on-${lead}`;
     this.stateEl.textContent = this.stateText();
     this.scoreEl.textContent = this.scoreText();
+  }
+
+  /** 当前占优的一方：even 表示均势 */
+  private leadingSide(): 'w' | 'b' | 'even' {
+    if (this.score.mate !== undefined) return this.score.mate > 0 ? 'w' : 'b';
+    const cp = this.score.cp ?? 0;
+    if (Math.abs(cp) < 50) return 'even';
+    return cp > 0 ? 'w' : 'b';
+  }
+
+  /**
+   * 文字落在条的哪一端。默认白方在下：
+   * 白优 → 底部（白段外端）；黑优 → 顶部（黑段外端）；均势 → 居中。
+   * 翻转后白方在上，映射随之颠倒。
+   */
+  private textPosition(lead: 'w' | 'b' | 'even'): 'top' | 'center' | 'bottom' {
+    if (lead === 'even') return 'center';
+    const whiteAtBottom = !this.flipped;
+    if (lead === 'w') return whiteAtBottom ? 'bottom' : 'top';
+    return whiteAtBottom ? 'top' : 'bottom';
   }
 
   /** 白方胜率百分比（0–100） */

@@ -13,6 +13,8 @@ video/
 release/
 app/release/
 app/src-tauri/target/
+# 本地引擎二进制（103MB）不进仓库；打包前把 Stockfish 放到该目录并命名带目标三元组后缀
+app/src-tauri/binaries/
 
 # ---- Node / 前端工程 ----
 node_modules/

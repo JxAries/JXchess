@@ -8,9 +8,10 @@ import { BoardView } from '../board/boardView';
 import { BoardInput, type MovePlayed } from '../board/input';
 import { ReviewState } from '../game/gameState';
 import { renderMoveList } from '../panels/moveList';
-import { openTextDialog } from '../panels/dialog';
+import { openAlert, openTextDialog } from '../panels/dialog';
 import { openDisplaySettings, openEngineSettings } from '../panels/settingsDialog';
 import { EvalBar } from '../panels/evalBar';
+import { isDesktop, shutdownEngine, startEngine } from '../engine/client';
 import { loadDisplay, type DisplaySettings } from '../settings';
 import { SoundFX } from '../effects/sound';
 import { pieceImage, type PieceKind } from '../game/types';
@@ -28,7 +29,6 @@ const boardWrap = must('board-wrap');
 const moveListEl = must('move-list');
 const capTop = must('cap-top');
 const capBottom = must('cap-bottom');
-const panelNote = must('panel-note');
 const filePicker = must<HTMLInputElement>('file-picker');
 const btnNewBranch = must<HTMLButtonElement>('btn-new-branch');
 const btnDeleteBranch = must<HTMLButtonElement>('btn-delete-branch');
@@ -48,17 +48,11 @@ let display: DisplaySettings = loadDisplay();
 let timingView = false;
 
 /**
- * 在棋谱面板内显示一行提示，替代浮动弹窗。
- * 刻意不设定时清除：错误信息要一直留在面板上，方便用户看清原因；
- * 它会被下一条提示替换，或在用户完成一次成功的导入/走子后清掉。
+ * 错误与提示统一用弹窗输出：之前塞在棋谱面板里的一行小字位置太隐蔽，
+ * 用户很难第一时间注意到；弹窗更直接（点“知道了”、遮罩或 Esc 关闭）。
  */
 function showNote(message: string): void {
-  panelNote.textContent = message;
-}
-
-/** 清掉面板内的提示行（该行没有内容时不会占位） */
-function clearNote(): void {
-  panelNote.textContent = '';
+  openAlert('提示', message);
 }
 
 /** 把显示设置应用到页面（只切 class，具体样式交给 CSS） */
@@ -150,12 +144,8 @@ function refresh(play: MovePlayed | null): void {
   }
 
   renderMoveList(moveListEl, state, {
-    goToDepth: (depth) => {
-      state.goMainDepth(depth);
-      refresh(null);
-    },
-    goVariationStep: (row, index, step) => {
-      state.goVariationStep(row, index, step);
+    goToNode: (id) => {
+      state.goToNodeId(id);
       refresh(null);
     },
   });
@@ -168,11 +158,7 @@ function refresh(play: MovePlayed | null): void {
 function loadPgnText(text: string): void {
   const error = state.loadPgn(text);
   if (error) showNote(error);
-  else {
-    // 导入成功：清掉上一次残留的错误提示
-    clearNote();
-    refresh(null);
-  }
+  else refresh(null);
 }
 
 function downloadPgn(): void {
@@ -207,11 +193,7 @@ function pickFile(): Promise<string | null> {
 
 // 棋盘交互：点击与拖拽均在此触发刷新
 new BoardInput(board, state, {
-  onChanged: (move) => {
-    // 走出一步合法着法即视为已恢复正常，清掉之前残留的错误提示
-    clearNote();
-    refresh(move);
-  },
+  onChanged: (move) => refresh(move),
   onMessage: showNote,
   // 拖拽中途松手（或落到非法格）时，把棋盘恢复成常规高亮
   onDragEnd: () => refresh(null),
@@ -278,10 +260,30 @@ btnDeleteBranch.addEventListener('click', () => {
   refresh(null);
 });
 
-// 分析面板：P1 只有骨架，点击给出说明
-btnAnalyze.addEventListener('click', () => {
-  showNote('引擎分析将在 P2 接入，当前先展示界面框架。');
+// 分析面板：P2 先打通“启动本地引擎并读取版本”，分析计算下一步接入
+btnAnalyze.addEventListener('click', async () => {
+  if (!isDesktop()) {
+    showNote('引擎分析仅在桌面版可用；浏览器预览里只展示界面。');
+    return;
+  }
+  btnAnalyze.disabled = true;
+  btnAnalyze.textContent = '正在启动…';
+  try {
+    const name = await startEngine();
+    showNote(`本地引擎已就绪：${name}。逐手分析将在下一步接入。`);
+  } catch (error) {
+    showNote(`引擎启动失败：${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    btnAnalyze.disabled = false;
+    btnAnalyze.textContent = '分析本局';
+  }
 });
+
+// 退出前关闭引擎，避免残留 stockfish 进程
+window.addEventListener('beforeunload', () => {
+  void shutdownEngine();
+});
+
 
 // 图表切换：局面走势 ⇄ 用时分析
 btnChartToggle.addEventListener('click', () => {

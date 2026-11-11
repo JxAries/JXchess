@@ -1,4 +1,4 @@
-﻿/* JXchess v0.1 全局样式：报纸风（Newspaper）。
+/* JXchess v0.1 全局样式：报纸风（Newspaper）。
    要点：棋盘用极浅两色 + 细线分格而不靠大色块；界面以暖灰纸色为主；
    只保留一种低饱和深红作为强调色；按钮统一为细边框幽灵样式；全局禁止选中与原生拖图。
 
@@ -315,26 +315,6 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   border-bottom: 1px solid var(--line);
 }
 .panel-tools .btn { padding: 6px 4px; font-size: 12px; }
-/* 面板内的一行小字反馈（替代浮动提示框），位于按钮组与播放控制条之间。
-   两个要求同时成立：
-   1. 没有消息时不能留出空白行 —— 所以 .panel-note:empty 直接不参与布局；
-   2. 有消息时常驻显示、不自动消失，便于用户读清错误原因 —— 由 review.ts 控制内容。
-   有消息时钉成固定高度（18px 内容 + 1px 下边框 = 19px），文字单行、过长省略号截断，绝不撑高版面。 */
-.panel-note {
-  margin: 0;
-  padding: 0 12px;
-  height: 19px;
-  line-height: 18px;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--accent);
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* 没有消息时整行不占位，避免按钮组和控制条之间出现空行 */
-.panel-note:empty { display: none; }
 
 /* 得子：不再放在棋谱面板，改为棋盘上下两条，只摆棋子图标、不写文字 */
 .cap-strip {
@@ -359,25 +339,38 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .movepanel .move-list { flex: 1; min-height: 80px; }
 .move-list { overflow-y: auto; padding: 2px 0; }
 .ply-list { display: flex; flex-direction: column; }
+/* 一行一个回合：序号 + 白方一着 + 黑方一着 */
 .ply-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
+  gap: 6px;
+  min-height: 34px;
   padding: 0 10px;
   border-bottom: 1px solid var(--line);
   font-size: 15px;
 }
 .ply-row:last-child { border-bottom: 0; }
 .ply-num {
-  width: 26px;
-  flex-shrink: 0;
   font-size: 11px;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
+.ply-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.ply-cell.cur { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .ply-san {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   text-align: left;
   border: 0;
   background: none;
@@ -389,22 +382,21 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 }
 .ply-san:hover { color: var(--accent); }
 .ply-score {
-  width: 44px;
+  width: 40px;
   flex-shrink: 0;
   text-align: right;
   font-size: 11px;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
-.ply-row.cur { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+/* 变例：缩进由 JS 按层级写入 padding-left；第一层字号更小，更深层不再缩小 */
 .ply-row.var {
   font-size: 12.5px;
-  min-height: 27px;
-  padding-left: 26px;
+  min-height: 29px;
   border-left: 3px solid transparent;
 }
 .ply-row.var-first .ply-san { font-weight: 600; }
-.ply-row.var .ply-score { font-size: 10px; }
+.ply-row.var .ply-score { width: 36px; font-size: 10px; }
 .var-hue-0 { border-left-color: #8fa3b0; }
 .var-hue-1 { border-left-color: #9bb09b; }
 .var-hue-2 { border-left-color: #b5a58a; }
@@ -435,6 +427,15 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   padding: 16px;
 }
 .dialog h3 { margin: 0 0 10px; font-size: 16px; }
+/* 提示弹窗：错误信息不再塞在面板角落，改用弹窗让用户第一眼看到 */
+.alert-dialog { width: min(420px, 92vw); }
+.alert-message {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink);
+  word-break: break-word;
+}
 .dialog textarea {
   width: 100%;
   min-height: 150px;
@@ -628,13 +629,14 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   height: var(--bw);
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
+  /* 默认白方在下、黑方在上，与棋盘方向一致 */
+  flex-direction: column-reverse;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #3a3936;
 }
-.evalbar.flipped { flex-direction: column-reverse; }
+.evalbar.flipped { flex-direction: column; }
 .evalbar-white { height: 50%; background: #f4f2ec; transition: height 0.18s ease; }
 .evalbar-black { flex: 1; background: #3a3936; }
 .evalbar-text {
@@ -643,22 +645,30 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 4px;
+  padding: 6px 0;
   pointer-events: none;
   text-align: center;
   font-size: 9px;
   line-height: 1.1;
+  justify-content: center;
 }
+/* 文字贴到占优一方的色段外端 */
+.evalbar-text.pos-top { justify-content: flex-start; }
+.evalbar-text.pos-bottom { justify-content: flex-end; }
+.evalbar-text.pos-center { justify-content: center; }
 .evalbar-state,
 .evalbar-score {
-  background: rgba(43, 42, 40, 0.62);
-  color: #fff;
-  border-radius: 3px;
-  padding: 1px 2px;
   white-space: nowrap;
+  padding: 1px 2px;
+  border-radius: 3px;
+  background: transparent;
 }
 .evalbar-score { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 白段上的文字用深色，黑段上的文字用浅色，均势保留原来的深底白字 */
+.evalbar-text.on-w span { color: #2b2a28; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45); }
+.evalbar-text.on-b span { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55); }
+.evalbar-text.on-even span { color: #ffffff; background: rgba(43, 42, 40, 0.62); }
 
 /* ---- 左侧分析面板 ---- */
 .analysis-panel { position: relative; }

@@ -70,6 +70,7 @@ JXchess 是一个开源、免费、个人维护的项目。商业与盈利目前
 ## 素材与许可
 
 - 棋子图标：使用 lichess 项目 lila 中的 gioco 棋子样式，作者 sadsnake1，许可为 CC BY-NC-SA 4.0，需署名、非商业、相同方式共享。来源：https://github.com/lichess-org/lila 的 public/piece/gioco。
+- 本地引擎：Stockfish 19，作者 the Stockfish developers，许可为 GPL-3.0。以官方发布的独立可执行文件形式随安装包分发，未修改其源码；完整许可证见安装目录下的 `resources/licenses/stockfish-Copying.txt`，源码可从 https://github.com/official-stockfish/Stockfish 获取。
 - 棋盘配色参考 lichess 的 Newspaper 主题，但排线与高亮均由本项目用 CSS 自行实现，未引入 lichess 的素材文件。
 - 仓库协议：MPL-2.0，仅适用于本项目自研代码；第三方素材保留其自身许可。
 

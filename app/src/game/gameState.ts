@@ -2,7 +2,7 @@
  * 复盘状态机（分支树版）：以“树”保存对局——每个节点记录一步着法与它的后续分支。
  * 导入 PGN 后主线固定，在任一节点走出不同着法即自动生成变例分支；纯手摆/新建时走新着法则覆盖其后走法。
  * 所有展示局面都由“起点 FEN + 当前路径重放”得到，避免状态漂移。
- * 重要函数：loadPgn、playMove、goMainDepth、goVariation、stepNext、variationsOfRow。
+ * 重要函数：loadPgn、playMove、goMainDepth、goToNodeId、stepNext、moveLayout。
  */
 import { Chess } from 'chess.js';
 import type { PieceSymbol, Square } from 'chess.js';
@@ -21,21 +21,30 @@ export type PlayResult =
   | { ok: true; san: string; isVariation: boolean }
   | { ok: false; error: string };
 
-/** 变例中的一步：供棋谱逐行渲染（主线每步一行、分支也每步一行） */
-export interface VariationMove {
+/** 棋谱里的一步：供“每行一对黑白着法”的渲染使用 */
+export interface PlyInfo {
+  /** 本次布局内的临时 id，点击时用它跳回对应节点 */
+  id: number;
   san: string;
   moveNumber: number;
   side: 'w' | 'b';
-  /** 在该支线内的序号（0 起），用于点击跳到对应步 */
-  step: number;
+  current: boolean;
 }
 
-/** 棋谱面板用的一条变例：按步拆开，activeStep 标示光标在这条支线的位置 */
-export interface VariationLine {
-  index: number;
-  moves: VariationMove[];
-  active: boolean;
-  activeStep: number;
+/** 一条变例：anchorId 表示它是在哪一步之后的局面里走出来的（0 表示开局前） */
+export interface BranchGroup {
+  anchorId: number;
+  /** 嵌套层级，1 为第一层分支 */
+  level: number;
+  /** 0–3，用于同层不同分支的色条 */
+  hue: number;
+  plies: PlyInfo[];
+}
+
+/** 整盘棋的渲染数据：主线 + 所有层级的分支 */
+export interface MoveLayout {
+  main: PlyInfo[];
+  groups: BranchGroup[];
 }
 
 /** 一步着法及其子分支 */
@@ -61,6 +70,10 @@ export class ReviewState {
   /** 虚拟根节点，它的 children[0] 链即主线 */
   private root: TreeNode = this.makeNode('');
   private cursor: TreeNode | null = null;
+
+  /** moveLayout 期间分配的临时 id 映射，供 goToNodeId 使用 */
+  private idMap = new Map<number, TreeNode>();
+  private idCounter = 0;
 
   private makeNode(san: string): TreeNode {
     return { san, from: '', to: '', capture: false, parent: null, children: [] };
@@ -142,20 +155,6 @@ export class ReviewState {
     this.cursor = depth <= 0 ? null : (main[depth - 1] ?? null);
   }
 
-  /** 进入某条变例：depth 是“被替代主线步”所在行（同 goMainDepth 口径），
-   * index 是该位置第几条变例；默认跳到该变例最深处。 */
-  goVariation(depth: number, index: number): void {
-    this.branchArmed = false;
-    const main = this.mainPath();
-    const holder = depth <= 0 ? this.root : main[depth - 1];
-    if (!holder) return;
-    const extra = holder.children.filter((_, i) => i > 0)[index];
-    if (!extra) return;
-    let node = extra;
-    while (node.children[0]) node = node.children[0];
-    this.cursor = node;
-  }
-
   /** 在某行位置下的第 index 条变例的分支起点节点 */
   private variationStart(row: number, index: number): TreeNode | null {
     const main = this.mainPath();
@@ -164,72 +163,70 @@ export class ReviewState {
     return holder.children.filter((_, i) => i > 0)[index] ?? null;
   }
 
-  /** 光标位于以 start 为首节点的变例链上的第几步（0 起）；不在该链上返回 -1 */
-  private stepWithin(start: TreeNode, cursor: TreeNode | null): number {
-    let node: TreeNode | null = start;
-    let step = 0;
-    while (node) {
-      if (node === cursor) return step;
-      node = node.children[0];
-      step += 1;
-    }
-    return -1;
-  }
-
   /**
-   * 某主线行下已有的变例，按“每步一条”返回结构化数据，供棋谱逐行渲染。
-   * 第 row 行表示“主线走了 row 步之后”的位置；row=0 即开局前。
+   * 整盘棋的渲染数据：主线按顺序铺平，所有层级的变例放在 groups 里，
+   * 每条变例用 anchorId 指明“它是在哪一步之后的局面里走出来的”（0 = 开局前）。
+   * 每次调用都会重新分配临时 id，并记录 id → 节点，供 goToNodeId 跳转。
    */
-  variationLines(row: number): VariationLine[] {
-    const main = this.mainPath();
-    const holder = row <= 0 ? this.root : main[row - 1];
-    if (!holder) return [];
-    const anchor = this.variationAnchor();
+  moveLayout(): MoveLayout {
+    this.idCounter = 0;
+    this.idMap.clear();
+    const groups: BranchGroup[] = [];
 
-    // 该行位置的局面，用于计算回合数与行棋方
-    const base = new Chess(this.startFen);
-    for (let i = 0; i < row; i++) {
-      const step = main[i];
-      base.move({ from: step.from, to: step.to, promotion: step.promotion });
+    const assign = (node: TreeNode): number => {
+      const id = ++this.idCounter;
+      this.idMap.set(id, node);
+      return id;
+    };
+
+    /** 走完一条链；level=0 为主线，>=1 为变例 */
+    const walk = (start: TreeNode, startFen: string, level: number): PlyInfo[] => {
+      const chess = new Chess(startFen);
+      const plies: PlyInfo[] = [];
+      let node: TreeNode | null = start;
+      while (node) {
+        const info: PlyInfo = {
+          id: assign(node),
+          san: node.san,
+          moveNumber: chess.moveNumber(),
+          side: chess.turn(),
+          current: node === this.cursor,
+        };
+        plies.push(info);
+        chess.move({ from: node.from, to: node.to, promotion: node.promotion });
+
+        // 走完这一步之后出现的其它选择，就是下一层变例
+        for (let i = 1; i < node.children.length; i++) {
+          const group: BranchGroup = {
+            anchorId: info.id,
+            level: level + 1,
+            hue: groups.length % 4,
+            plies: [],
+          };
+          groups.push(group);
+          group.plies = walk(node.children[i], chess.fen(), level + 1);
+        }
+        node = node.children[0];
+      }
+      return plies;
+    };
+
+    // 开局前就存在的变例（先于第一步）
+    for (let i = 1; i < this.root.children.length; i++) {
+      const group: BranchGroup = { anchorId: 0, level: 1, hue: groups.length % 4, plies: [] };
+      groups.push(group);
+      group.plies = walk(this.root.children[i], this.startFen, 1);
     }
 
-    const lines: VariationLine[] = [];
-    holder.children.forEach((child, i) => {
-      if (i === 0) return;
-      const lineChess = new Chess(base.fen());
-      const moves: VariationMove[] = [];
-      let node: TreeNode | null = child;
-      let step = 0;
-      while (node) {
-        moves.push({
-          san: node.san,
-          moveNumber: lineChess.moveNumber(),
-          side: lineChess.turn(),
-          step,
-        });
-        lineChess.move({ from: node.from, to: node.to, promotion: node.promotion });
-        node = node.children[0];
-        step += 1;
-      }
-      const index = lines.length;
-      const isActive = Boolean(anchor && anchor.row === row && anchor.index === index);
-      lines.push({
-        index,
-        moves,
-        active: isActive,
-        activeStep: isActive ? this.stepWithin(child, this.cursor) : -1,
-      });
-    });
-    return lines;
+    const main = this.root.children[0] ? walk(this.root.children[0], this.startFen, 0) : [];
+    return { main, groups };
   }
 
-  /** 跳到某条第 row 行变例的第 step 步；越界时停在末端 */
-  goVariationStep(row: number, index: number, step: number): void {
-    const start = this.variationStart(row, index);
-    if (!start) return;
+  /** 跳到 moveLayout 分配的某个临时 id 对应的节点 */
+  goToNodeId(id: number): void {
+    const node = this.idMap.get(id);
+    if (!node) return;
     this.branchArmed = false;
-    let node = start;
-    for (let i = 0; i < step && node.children[0]; i++) node = node.children[0];
     this.cursor = node;
   }
 
