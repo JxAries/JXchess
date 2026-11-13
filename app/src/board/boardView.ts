@@ -30,6 +30,7 @@ export class BoardView {
 
   private cells = new Map<SquareName, HTMLDivElement>();
   private imgs = new Map<SquareName, HTMLImageElement>();
+  private annotations = new Map<SquareName, HTMLElement>();
   private drag: DragHandlers | null = null;
   private dragFrom: string | null = null;
   private dragGhost: HTMLImageElement | null = null;
@@ -49,6 +50,7 @@ export class BoardView {
     this.flip = flipped;
     this.cells.clear();
     this.imgs.clear();
+    this.annotations.clear();
     this.root.textContent = '';
     this.buildCells();
   }
@@ -95,6 +97,12 @@ export class BoardView {
         const overlay = document.createElement('span');
         overlay.className = 'hl';
         cell.appendChild(overlay);
+
+        // 逐手优劣标注（画在棋子右上角）：!! / ★ / ! / ?! / ? / ?? / #
+        const annotation = document.createElement('span');
+        annotation.className = 'annotation';
+        cell.appendChild(annotation);
+        this.annotations.set(sq, annotation);
 
         cell.style.gridRowStart = String(this.flip ? rank : 9 - rank);
         cell.style.gridColumnStart = String(this.flip ? 8 - f : f + 1);
@@ -288,6 +296,24 @@ export class BoardView {
   markCheck(sq: SquareName | null): void {
     this.clearChecks();
     if (sq) this.cells.get(sq)?.classList.add('check');
+  }
+
+  /** 清空棋子右上角的所有标注 */
+  clearAnnotations(): void {
+    for (const el of this.annotations.values()) {
+      el.textContent = '';
+      el.className = 'annotation';
+    }
+  }
+
+  /** 在棋子右上角显示逐手标注；传 null 或空文本相当于清空 */
+  markAnnotation(sq: SquareName | null, text: string, kind: string): void {
+    this.clearAnnotations();
+    if (!sq || !text) return;
+    const el = this.annotations.get(sq);
+    if (!el) return;
+    el.textContent = text;
+    el.className = `annotation kind-${kind}`;
   }
 
   /**

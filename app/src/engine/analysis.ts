@@ -70,6 +70,7 @@ export class AnalysisController {
   private currentDepth = 0;
   private timer = 0;
   private lastEmit = 0;
+  private scanning = false;
   private onUpdate: (analysis: PositionAnalysis) => void;
   /** 已算过的局面分（白方视角），键为 FEN，用于棋谱每步右侧的评分 */
   private scores = new Map<string, { cp?: number; mate?: number }>();
@@ -81,6 +82,42 @@ export class AnalysisController {
 
   /** 切到新局面前先停掉上一个分析 */
   async analyze(fen: string): Promise<void> {
+    if (this.scanning) return;
+    await this.startPosition(fen);
+  }
+
+  /** 整局逐手分析：按顺序把每一手之后的局面各算一次（深度 10） */
+  async scanGame(fens: readonly string[], onProgress?: (done: number, total: number) => void): Promise<void> {
+    if (this.scanning) return;
+    this.scanning = true;
+    try {
+      await this.init();
+      for (let i = 0; i < fens.length; i++) {
+        const fen = fens[i];
+        if (!this.scores.has(fen)) {
+          await this.startPosition(fen);
+          // 等这一手出分（最多 2.5s，避免个别局面卡住整局）
+          for (let t = 0; t < 25; t++) {
+            if (this.scores.has(fen)) break;
+            await new Promise((resolve) => window.setTimeout(resolve, 100));
+          }
+        }
+        onProgress?.(i + 1, fens.length);
+      }
+    } finally {
+      this.scanning = false;
+    }
+  }
+
+  /** 某个局面的白方视角厘兵分；将杀按 ±1000 处理，没算过返回 undefined */
+  evalCp(fen: string): number | undefined {
+    const score = this.scores.get(fen);
+    if (!score) return undefined;
+    if (score.mate !== undefined) return score.mate > 0 ? 1000 : -1000;
+    return score.cp;
+  }
+
+  private async startPosition(fen: string): Promise<void> {
     if (this.fen === fen) return;
     await this.init();
     this.fen = fen;

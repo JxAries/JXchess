@@ -31,6 +31,8 @@ export interface PlyInfo {
   current: boolean;
   /** 走完这一步之后的局面，用于按局面查评分 */
   fen: string;
+  /** 走这一步之前的局面，用于计算本步损失 */
+  fenBefore: string;
 }
 
 /** 一条变例：anchorId 表示它是在哪一步之后的局面里走出来的（0 表示开局前） */
@@ -194,6 +196,7 @@ export class ReviewState {
           side: chess.turn(),
           current: node === this.cursor,
           fen: '',
+          fenBefore: chess.fen(),
         };
         plies.push(info);
         chess.move({ from: node.from, to: node.to, promotion: node.promotion });
@@ -275,6 +278,30 @@ export class ReviewState {
   lastMoveInfo(): { from: string; to: string; capture: boolean } | null {
     if (!this.cursor) return null;
     return { from: this.cursor.from, to: this.cursor.to, capture: this.cursor.capture };
+  }
+
+  /** 主线每一步之后的局面，第 0 项是开局；用于整局分析 */
+  mainFens(): string[] {
+    const fens = [this.startFen];
+    const chess = new Chess(this.startFen);
+    for (const node of this.mainPath()) {
+      chess.move({ from: node.from, to: node.to, promotion: node.promotion });
+      fens.push(chess.fen());
+    }
+    return fens;
+  }
+
+  /** 当前这一步之前 / 之后的局面；用于计算本步损失 */
+  currentFens(): { before: string; after: string } | null {
+    const path = this.pathToCursor();
+    if (path.length === 0) return null;
+    const chess = new Chess(this.startFen);
+    let before = chess.fen();
+    for (const node of path) {
+      before = chess.fen();
+      chess.move({ from: node.from, to: node.to, promotion: node.promotion });
+    }
+    return { before, after: chess.fen() };
   }
 
   /** 指定颜色王的所在格 */

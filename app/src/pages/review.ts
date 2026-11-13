@@ -11,8 +11,10 @@ import { renderMoveList } from '../panels/moveList';
 import { openAlert, openTextDialog } from '../panels/dialog';
 import { openDisplaySettings, openEngineSettings } from '../panels/settingsDialog';
 import { EvalBar } from '../panels/evalBar';
+import { renderEvalChart } from '../panels/evalChart';
 import { AnalysisController, formatScore, pvToSan, type EngineLine } from '../engine/analysis';
 import { shutdownEngine } from '../engine/client';
+import { ANNOTATION_SYMBOL, accuracyFromAcpl, classifyCpLoss, computeCpLoss, type AnnotationKind } from '../game/annotations';
 import { loadDisplay, type DisplaySettings } from '../settings';
 import { SoundFX } from '../effects/sound';
 import { pieceImage, type PieceKind } from '../game/types';
@@ -53,13 +55,15 @@ let flipped = false;
 let display: DisplaySettings = loadDisplay();
 let timingView = false;
 
-/** 引擎分析结果 → 评估条、左侧两条主变、棋谱每步评分 */
+/** 引擎分析结果 → 评估条、左侧两条主变、棋谱每步评分、棋子标注与统计图表 */
 const analysis = new AnalysisController((result) => {
   evalBar.setScore({ cp: result.cp, mate: result.mate });
   analysisMask.classList.add('hidden');
   paintEngineLine(result.lines[0], engineScore1, enginePv1, result.fen);
   paintEngineLine(result.lines[1], engineScore2, enginePv2, result.fen);
   paintMoveScores();
+  paintAnnotations();
+  renderStatsAndChart();
 });
 
 /** 填充左侧一条引擎推荐 */
@@ -81,6 +85,89 @@ function paintMoveScores(): void {
     const text = analysis.scoreFor(fen);
     if (text) el.textContent = text;
   });
+}
+
+/** 在刚走动的棋子右上角显示优劣标记；被将死的王上方显示 # */
+function paintAnnotations(): void {
+  if (!display.annotations) {
+    board.clearAnnotations();
+    return;
+  }
+  const current = state.currentFens();
+  const last = state.lastMoveInfo();
+  if (current && last) {
+    const before = analysis.evalCp(current.before);
+    const after = analysis.evalCp(current.after);
+    if (before !== undefined && after !== undefined) {
+      const side = current.before.split(' ')[1] === 'b' ? 'b' : 'w';
+      const loss = computeCpLoss(before, after, side);
+      const tag = classifyCpLoss(loss);
+      board.markAnnotation(last.to, ANNOTATION_SYMBOL[tag], tag);
+    } else {
+      board.clearAnnotations();
+    }
+  } else {
+    board.clearAnnotations();
+  }
+
+  const chess = state.chessNow();
+  if (chess.isCheckmate()) {
+    const king = state.kingSquare(chess.turn());
+    if (king) board.markAnnotation(king, '#', 'mate');
+    // 终局结论不依赖引擎在无着可走局面上的输出
+    evalBar.setScore({ mate: chess.turn() === 'w' ? -1 : 1 });
+  }
+}
+
+/** 用主线局面分刷新左侧统计与走势图 */
+function renderStatsAndChart(): void {
+  const fens = state.mainFens();
+  const values = fens.map((fen) => analysis.evalCp(fen));
+  const chart = document.querySelector<SVGSVGElement>('.chart-line');
+  if (chart) renderEvalChart(chart, values);
+  if (fens.length < 2) return;
+
+  type Counts = Record<AnnotationKind, number>;
+  const emptyCounts = (): Counts => ({
+    brilliant: 0,
+    best: 0,
+    good: 0,
+    normal: 0,
+    inaccuracy: 0,
+    mistake: 0,
+    blunder: 0,
+  });
+  const stats = {
+    w: { counts: emptyCounts(), sum: 0, moves: 0 },
+    b: { counts: emptyCounts(), sum: 0, moves: 0 },
+  };
+
+  for (let i = 0; i < fens.length - 1; i++) {
+    const before = values[i];
+    const after = values[i + 1];
+    if (before === undefined || after === undefined) continue;
+    const side = fens[i].split(' ')[1] === 'b' ? 'b' : 'w';
+    const loss = computeCpLoss(before, after, side);
+    const tag = classifyCpLoss(loss);
+    stats[side].counts[tag] += 1;
+    stats[side].sum += loss;
+    stats[side].moves += 1;
+  }
+
+  for (const side of ['w', 'b'] as const) {
+    const root = document.querySelector<HTMLElement>(`.stats-side[data-side="${side === 'w' ? 'white' : 'black'}"]`);
+    if (!root) continue;
+    for (const [kind, count] of Object.entries(stats[side].counts)) {
+      const el = root.querySelector<HTMLElement>(`[data-kind="${kind}"]`);
+      if (el) el.textContent = String(count);
+    }
+    const acpl = stats[side].moves ? Math.round(stats[side].sum / stats[side].moves) : 0;
+    const accuracy = stats[side].moves ? accuracyFromAcpl(acpl) : 0;
+    const accEl = root.querySelector<HTMLElement>('[data-kind="accuracy"]');
+    const acplEl = root.querySelector<HTMLElement>('[data-kind="acpl"]');
+    if (accEl) accEl.textContent = stats[side].moves ? `${accuracy}%` : '–';
+    if (acplEl) acplEl.textContent = stats[side].moves ? String(acpl) : '–';
+  }
 }
 
 /**
@@ -171,6 +258,13 @@ function refresh(play: MovePlayed | null): void {
   board.markLastMove(last ? last.from : null, last ? last.to : null);
   if (chess.inCheck()) board.markCheck(state.kingSquare(chess.turn()));
 
+  // 终局直接给确定结论，不依赖引擎在“无着可走”局面上的输出
+  if (chess.isCheckmate()) {
+    evalBar.setScore({ mate: chess.turn() === 'w' ? -1 : 1 });
+  } else if (chess.isGameOver()) {
+    evalBar.setScore({ cp: 0 });
+  }
+
   if (play) {
     // 吃子与将军同时发生时，用吃子音效覆盖将军音效
     if (play.capture) sfx.capture();
@@ -190,6 +284,7 @@ function refresh(play: MovePlayed | null): void {
   renderResult();
   updateBranchButtons();
   paintMoveScores();
+  paintAnnotations();
 
   // 逐手分析默认开启：每换一个局面就从浅到深重新算
   if (display.autoAnalyze && window.__TAURI__) {
@@ -287,6 +382,7 @@ must('btn-display-settings').addEventListener('click', () => {
   openDisplaySettings((next) => {
     display = next;
     applyDisplaySettings();
+    paintAnnotations();
     if (!display.autoAnalyze) {
       void analysis.stop();
     } else if (window.__TAURI__) {
@@ -312,15 +408,25 @@ btnDeleteBranch.addEventListener('click', () => {
   refresh(null);
 });
 
-// 分析本局：从浅到深重新跑当前局面（逐手分析本身已默认开启）
+// 分析本局：把主线每一手之后的局面依次跑一遍（逐手分析本身已默认开启）
 btnAnalyze.addEventListener('click', async () => {
+  const fens = state.mainFens();
+  if (fens.length < 2) {
+    showNote('当前还没有棋谱，先导入棋谱或走几步。');
+    return;
+  }
   btnAnalyze.disabled = true;
-  btnAnalyze.textContent = '分析中…';
   try {
-    analysisMask.classList.remove('hidden');
-    await analysis.restart(state.chessNow().fen());
+    await analysis.scanGame(fens, (done, total) => {
+      btnAnalyze.textContent = `分析中 ${done}/${total}`;
+    });
+    paintMoveScores();
+    paintAnnotations();
+    renderStatsAndChart();
+    analysisMask.classList.add('hidden');
+    showNote(`整局分析完成，共 ${fens.length - 1} 手。`);
   } catch (error) {
-    showNote(`引擎启动失败：${error instanceof Error ? error.message : String(error)}`);
+    showNote(`整局分析失败：${error instanceof Error ? error.message : String(error)}`);
   } finally {
     btnAnalyze.disabled = false;
     btnAnalyze.textContent = '分析本局';

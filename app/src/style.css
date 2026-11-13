@@ -1,4 +1,4 @@
-/* JXchess v0.1 全局样式：报纸风（Newspaper）。
+﻿/* JXchess v0.1 全局样式：报纸风（Newspaper）。
    要点：棋盘用极浅两色 + 细线分格而不靠大色块；界面以暖灰纸色为主；
    只保留一种低饱和深红作为强调色；按钮统一为细边框幽灵样式；全局禁止选中与原生拖图。
 
@@ -167,6 +167,27 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   transition: transform 0.12s ease;
 }
 .sq:hover img.piece { transform: translateY(-1px); }
+
+/* 逐手优劣标注：画在棋子右上角（层级在棋子之上），符号见 game/annotations.ts */
+.sq .annotation {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  z-index: 5;
+  font-size: clamp(10px, 1.5vw, 15px);
+  font-weight: 700;
+  line-height: 1.1;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.7);
+}
+.sq .annotation.kind-brilliant { color: #2f7d8e; }
+.sq .annotation.kind-best { color: #8a6b1f; }
+.sq .annotation.kind-good { color: #3f7a4f; }
+.sq .annotation.kind-normal { color: #8b857c; }
+.sq .annotation.kind-inaccuracy { color: #a07a2c; }
+.sq .annotation.kind-mistake { color: #a25a3a; }
+.sq .annotation.kind-blunder { color: #9c3b3b; }
+.sq .annotation.kind-mate { color: #9c3b3b; font-size: clamp(13px, 1.8vw, 18px); }
 
 /* 拖拽时跟随鼠标的棋子 */
 .piece.drag-ghost {
@@ -746,6 +767,9 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .chart-bars { display: none; }
 .chart-body.timing .chart-line { display: none; }
 .chart-body.timing .chart-bars { display: block; }
+/* 用时数据缺失时的空状态 */
+.chart-empty { display: none; margin: 0; padding: 14px 10px; font-size: 11px; line-height: 1.6; color: var(--ink-2); text-align: center; }
+.chart-body.timing .chart-empty { display: block; }
 
 .stats-card {
   flex: 1 1 200px;
@@ -836,7 +860,7 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 /* ---- 显示设置关掉对应项时，相关元素直接隐藏（布局不跳动） ---- */
 .hide-evalbar .evalbar { display: none; }
 .hide-scores .ply-score { visibility: hidden; }
-.hide-annotations .piece-annotation { display: none; }
+.hide-annotations .annotation { display: none; }
 .hide-best-arrow .arrow-best { display: none; }
 .hide-extra-arrows .arrow-extra { display: none; }
 
