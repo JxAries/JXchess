@@ -195,6 +195,15 @@ if (fenParam) {
   if (error) showNote(error);
 }
 
+// 从对弈页跳转过来：读取刚才那盘棋的 PGN（用时另存在 sessionStorage，供之后画用时图）
+if (new URLSearchParams(location.search).get('fromPlay')) {
+  const pgn = sessionStorage.getItem('jxchess.play.pgn');
+  if (pgn) {
+    const error = state.loadPgn(pgn);
+    if (error) showNote(error);
+  }
+}
+
 function renderPlayers(): void {
   const { white, black } = state.players();
   playerWhite.textContent = white;

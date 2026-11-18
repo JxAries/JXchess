@@ -95,6 +95,29 @@ export async function stopSearch(): Promise<void> {
   await invoke('engine_stop');
 }
 
+/**
+ * 对弈用：让引擎针对局面走一步，返回 UCI 着法（如 e7e5）。
+ * 每次先 stop 再发 position/go，保证不会拿到上一次搜索的 bestmove。
+ */
+export async function bestMove(fen: string, movetimeMs: number): Promise<string> {
+  await ensureListening();
+  if (!started) await startEngine();
+  try {
+    await stopSearch();
+  } catch {
+    // 没有正在进行的搜索时忽略
+  }
+  await new Promise((resolve) => window.setTimeout(resolve, 40));
+  const movePromise = waitForLine((line) => line.startsWith('bestmove '), movetimeMs + 8000);
+  await invoke('engine_send', { line: 'setoption name MultiPV value 1' });
+  await invoke('engine_send', { line: `position fen ${fen}` });
+  await invoke('engine_send', { line: `go movetime ${movetimeMs}` });
+  const line = await movePromise;
+  const uci = line.split(/\s+/)[1];
+  if (!uci || uci === '(none)') throw new Error('引擎没有给出着法');
+  return uci;
+}
+
 /** 退出前关闭引擎 */
 export async function shutdownEngine(): Promise<void> {
   if (!started) return;

@@ -63,7 +63,9 @@ export class BoardView {
         const cell = document.createElement('div');
         cell.className = 'sq';
         cell.dataset.square = sq;
-        cell.classList.add((f + rank) % 2 === 0 ? 'dark' : 'light');
+        // 国际象棋标准：a1（左下角）是深色格，h1 是浅色格。
+        // 之前写成 (f + rank) % 2 === 0 ? dark : light，正好把整盘颜色反了。
+        cell.classList.add((f + rank) % 2 === 1 ? 'dark' : 'light');
 
         // 坐标标注放在视觉最外侧一行/一列：白方在下时在 a 列与第 1 行，翻转后在 h 列与第 8 行
         const label = this.flip ? { file: 'h', rank: 8 } : { file: 'a', rank: 1 };

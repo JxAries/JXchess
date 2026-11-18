@@ -944,3 +944,72 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 }
 .play-card h1 { margin: 0 0 8px; font-size: 24px; font-weight: 500; }
 .play-card p { margin: 0 0 18px; font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+
+/* ================= 对弈页 ================= */
+.page.play .play-stage { flex-direction: column; gap: 10px; }
+.time-options { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 18px 0 22px; }
+.time-option {
+  flex: 1 1 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+.time-option:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+.time-option strong { font-size: 20px; font-weight: 600; letter-spacing: 0.04em; }
+.time-option span { font-size: 11px; color: var(--ink-2); }
+
+.game-layout { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.clock-row {
+  width: var(--bw);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.clock-row.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.clock {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.clock-row.active .clock { color: var(--accent); }
+.play-status { min-height: 18px; font-size: 12px; color: var(--ink-2); }
+.play-actions { display: flex; gap: 8px; }
+
+.result-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(43, 42, 40, 0.35);
+}
+.result-mask[hidden] { display: none; }
+.result-card {
+  width: min(360px, 92vw);
+  padding: 24px;
+  text-align: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.result-card h2 { margin: 0 0 8px; font-size: 20px; font-weight: 500; }
+.result-card p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.result-card .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
