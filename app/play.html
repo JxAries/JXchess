@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 对弈页：选择时间限制后与本地 Stockfish 对弈；带双方计时与走棋用时记录。 -->
+<!-- 对弈页：先选人机/人人，再选时间限制；对局中显示双方时钟与得子。 -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -18,15 +18,26 @@
       <a class="nav-link" href="./index.html">首页</a>
       <a class="nav-link" href="./review.html">复盘</a>
       <a class="nav-link" href="./editor.html">摆棋</a>
+      <a class="nav-link active" href="./play.html">对弈</a>
     </nav>
     <div class="spacer"></div>
   </header>
 
   <main class="play-stage">
-    <!-- 时间限制选择 -->
+    <!-- 对弈方式 + 时间限制 -->
     <section class="play-card" id="setup">
       <h1>对弈</h1>
-      <p>与本地 Stockfish 对弈。选择时间限制后开始，你执白先行。</p>
+      <p>选择对弈方式与时间限制。</p>
+
+      <div class="mode-options">
+        <button class="mode-option selected" type="button" data-mode="engine">
+          <strong>人机对弈</strong><span>与本地 Stockfish</span>
+        </button>
+        <button class="mode-option" type="button" data-mode="human">
+          <strong>人人对弈</strong><span>同一台电脑轮流走</span>
+        </button>
+      </div>
+
       <div class="time-options">
         <button class="time-option" type="button" data-base="300000" data-inc="0">
           <strong>5+0</strong><span>5 分钟 · 无加秒</span>
@@ -38,26 +49,22 @@
           <strong>15+10</strong><span>15 分钟 · 每步加 10 秒</span>
         </button>
       </div>
-      <a class="btn" href="./index.html">返回首页</a>
     </section>
 
     <!-- 对局中 -->
     <section class="game-layout" id="game" hidden>
       <div class="clock-row" id="clock-black-row">
-        <span class="player-name">黑方 · Stockfish</span>
+        <span class="player-name" id="name-black">黑方</span>
+        <span class="clock-caps" id="cap-black"></span>
         <span class="clock" id="clock-black">05:00</span>
       </div>
 
       <div class="board-wrap" id="play-board"></div>
 
       <div class="clock-row" id="clock-white-row">
-        <span class="player-name">白方 · 你</span>
+        <span class="player-name" id="name-white">白方</span>
+        <span class="clock-caps" id="cap-white"></span>
         <span class="clock" id="clock-white">05:00</span>
-      </div>
-
-      <div class="play-status" id="play-status">轮到你走棋</div>
-      <div class="play-actions">
-        <button class="btn" type="button" id="btn-back">退出对局</button>
       </div>
     </section>
 

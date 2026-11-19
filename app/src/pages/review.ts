@@ -4,17 +4,17 @@
  * 变例记录与支线管理、显示/引擎设置入口。
  * P1 阶段分析面板与评估条为静态骨架，引擎接入在 P2。
  */
-import { BoardView } from '../board/boardView';
+import { BoardView, type BoardArrow } from '../board/boardView';
 import { BoardInput, type MovePlayed } from '../board/input';
 import { ReviewState } from '../game/gameState';
 import { renderMoveList } from '../panels/moveList';
 import { openAlert, openTextDialog } from '../panels/dialog';
 import { openDisplaySettings, openEngineSettings } from '../panels/settingsDialog';
 import { EvalBar } from '../panels/evalBar';
-import { renderEvalChart } from '../panels/evalChart';
+import { renderEvalChart, renderTimingChart } from '../panels/evalChart';
 import { AnalysisController, formatScore, pvToSan, type EngineLine } from '../engine/analysis';
 import { shutdownEngine } from '../engine/client';
-import { ANNOTATION_SYMBOL, accuracyFromAcpl, classifyCpLoss, computeCpLoss, type AnnotationKind } from '../game/annotations';
+import { ANNOTATION_SYMBOL, accuracyFromAcpl, classifyMove, computeCpLoss, isSacrificeFen, type AnnotationKind } from '../game/annotations';
 import { loadDisplay, type DisplaySettings } from '../settings';
 import { SoundFX } from '../effects/sound';
 import { pieceImage, type PieceKind } from '../game/types';
@@ -47,6 +47,10 @@ const enginePv1 = must('engine-pv-1');
 const engineScore2 = must('engine-score-2');
 const enginePv2 = must('engine-pv-2');
 const analysisMask = must('analysis-mask');
+const analysisProgress = must('analysis-progress');
+const analysisProgressFill = must('analysis-progress-fill');
+const analysisProgressLabel = must('analysis-progress-label');
+const chartEmpty = document.querySelector<HTMLElement>('.chart-empty');
 
 const board = new BoardView(boardWrap);
 const evalBar = new EvalBar(must('evalbar'));
@@ -54,16 +58,34 @@ const sfx = new SoundFX();
 let flipped = false;
 let display: DisplaySettings = loadDisplay();
 let timingView = false;
+// 深度分析是否已完成（完成后左侧栏才显示，后续新着法允许自动分析补充）
+let panelRevealed = false;
 
-/** 引擎分析结果 → 评估条、左侧两条主变、棋谱每步评分、棋子标注与统计图表 */
-const analysis = new AnalysisController((result) => {
-  evalBar.setScore({ cp: result.cp, mate: result.mate });
-  analysisMask.classList.add('hidden');
+/** 引擎分析结果：自动分析只更新评估条；深度分析完成后才统一写左侧栏、棋谱评分与标注 */
+const analysis = new AnalysisController((result, mode) => {
+  // 深度分析过程中不要逐手刷新，等整局完成再统一更新
+  if (mode === 'deep') return;
+  // 结果只对当前选中的局面生效，避免切步后旧结果覆盖
+  if (result.fen !== state.chessNow().fen()) return;
+  const deep = analysis.analysisFor(result.fen, false);
+  if (!deep) evalBar.setScore({ cp: result.cp, mate: result.mate });
+  // 导入的棋局：未点“分析本局”前，自动分析不参与左侧栏
+  if (state.imported && !panelRevealed) return;
+  if (deep) {
+    // 已经有深度结果时，自动分析不能覆盖左侧栏
+    paintStoredAnalysis();
+    paintMoveScores();
+    paintAnnotations();
+    renderStatsAndChart();
+    paintArrows();
+    return;
+  }
   paintEngineLine(result.lines[0], engineScore1, enginePv1, result.fen);
   paintEngineLine(result.lines[1], engineScore2, enginePv2, result.fen);
   paintMoveScores();
   paintAnnotations();
   renderStatsAndChart();
+  paintArrows();
 });
 
 /** 填充左侧一条引擎推荐 */
@@ -82,8 +104,7 @@ function paintMoveScores(): void {
   moveListEl.querySelectorAll<HTMLElement>('.ply-score').forEach((el) => {
     const fen = el.dataset.fen;
     if (!fen) return;
-    const text = analysis.scoreFor(fen);
-    if (text) el.textContent = text;
+    el.textContent = analysis.scoreFor(fen);
   });
 }
 
@@ -100,8 +121,7 @@ function paintAnnotations(): void {
     const after = analysis.evalCp(current.after);
     if (before !== undefined && after !== undefined) {
       const side = current.before.split(' ')[1] === 'b' ? 'b' : 'w';
-      const loss = computeCpLoss(before, after, side);
-      const tag = classifyCpLoss(loss);
+      const tag = classifyMove(before, after, side, { sacrifice: isSacrificeFen(current.before, current.after, side) });
       board.markAnnotation(last.to, ANNOTATION_SYMBOL[tag], tag);
     } else {
       board.clearAnnotations();
@@ -116,16 +136,23 @@ function paintAnnotations(): void {
     if (king) board.markAnnotation(king, '#', 'mate');
     // 终局结论不依赖引擎在无着可走局面上的输出
     evalBar.setScore({ mate: chess.turn() === 'w' ? -1 : 1 });
+  } else if (chess.isGameOver()) {
+    // 和棋：双方王右上角显示 =
+    const marks: Array<{ sq: string; text: string; kind: string }> = [];
+    const whiteKing = state.kingSquare('w');
+    const blackKing = state.kingSquare('b');
+    if (whiteKing) marks.push({ sq: whiteKing, text: '=', kind: 'draw' });
+    if (blackKing) marks.push({ sq: blackKing, text: '=', kind: 'draw' });
+    board.markAnnotations(marks);
+    evalBar.setScore({ cp: 0 });
   }
 }
 
-/** 用主线局面分刷新左侧统计与走势图 */
+/** 用主线局面分刷新左侧统计、走势图或用时图 */
 function renderStatsAndChart(): void {
   const fens = state.mainFens();
   const values = fens.map((fen) => analysis.evalCp(fen));
-  const chart = document.querySelector<SVGSVGElement>('.chart-line');
-  if (chart) renderEvalChart(chart, values);
-  if (fens.length < 2) return;
+  const tags: Array<AnnotationKind | undefined> = new Array(values.length).fill(undefined);
 
   type Counts = Record<AnnotationKind, number>;
   const emptyCounts = (): Counts => ({
@@ -148,11 +175,25 @@ function renderStatsAndChart(): void {
     if (before === undefined || after === undefined) continue;
     const side = fens[i].split(' ')[1] === 'b' ? 'b' : 'w';
     const loss = computeCpLoss(before, after, side);
-    const tag = classifyCpLoss(loss);
+    const tag = classifyMove(before, after, side, { sacrifice: isSacrificeFen(fens[i], fens[i + 1], side) });
+    tags[i + 1] = tag;
     stats[side].counts[tag] += 1;
     stats[side].sum += loss;
     stats[side].moves += 1;
   }
+
+  const chart = document.querySelector<SVGSVGElement>('.chart-line');
+  if (chart) {
+    if (timingView) {
+      renderTimingChart(chart, playTimes);
+      chartEmpty?.classList.toggle('show', playTimes.length === 0);
+    } else {
+      renderEvalChart(chart, values, state.mainDepth(), tags);
+      chartEmpty?.classList.remove('show');
+    }
+  }
+
+  if (fens.length < 2) return;
 
   for (const side of ['w', 'b'] as const) {
     const root = document.querySelector<HTMLElement>(`.stats-side[data-side="${side === 'w' ? 'white' : 'black'}"]`);
@@ -168,6 +209,74 @@ function renderStatsAndChart(): void {
     if (accEl) accEl.textContent = stats[side].moves ? `${accuracy}%` : '–';
     if (acplEl) acplEl.textContent = stats[side].moves ? String(acpl) : '–';
   }
+}
+
+/** 深度分析进度：按钮位置换成进度条 */
+function setAnalysisProgress(done: number, total: number): void {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  analysisProgressFill.style.width = `${pct}%`;
+  analysisProgressLabel.textContent = `${pct}%`;
+}
+
+/** 导入新棋局时：左侧栏回到“未分析”状态；没导入棋谱时不显示蒙版 */
+function resetAnalysisPanel(): void {
+  panelRevealed = false;
+  analysis.clearDeep();
+  board.clearAnnotations();
+  board.clearArrows();
+  moveListEl.querySelectorAll<HTMLElement>('.ply-score').forEach((el) => {
+    el.textContent = '';
+  });
+  analysisProgress.hidden = true;
+  btnAnalyze.hidden = false;
+  btnAnalyze.disabled = false;
+  btnAnalyze.textContent = '分析本局';
+  syncAnalysisMask();
+  renderStatsAndChart();
+}
+
+/** 有导入棋谱且未深度分析时才显示蒙版；空棋盘直接露出左侧栏 */
+function syncAnalysisMask(): void {
+  analysisMask.classList.toggle('hidden', !state.imported || panelRevealed);
+}
+
+/** 按当前局面取已存的分析，更新一选/二选与评估条（跟随切步） */
+function paintStoredAnalysis(): void {
+  const fen = state.chessNow().fen();
+  const stored = analysis.analysisFor(fen, !state.imported || panelRevealed);
+  if (!stored) {
+    paintEngineLine(undefined, engineScore1, enginePv1, fen);
+    paintEngineLine(undefined, engineScore2, enginePv2, fen);
+    return;
+  }
+  evalBar.setScore({ cp: stored.cp, mate: stored.mate });
+  paintEngineLine(stored.lines[0], engineScore1, enginePv1, fen);
+  paintEngineLine(stored.lines[1], engineScore2, enginePv2, fen);
+}
+
+/** 显示设置：最佳着法 / 二选三选箭头 */
+function paintArrows(): void {
+  if (!display.bestArrow && !display.extraArrows) {
+    board.clearArrows();
+    return;
+  }
+  const fen = state.chessNow().fen();
+  const stored = analysis.analysisFor(fen, !state.imported || panelRevealed);
+  if (!stored) {
+    board.clearArrows();
+    return;
+  }
+  const arrows: BoardArrow[] = [];
+  const add = (line: (typeof stored.lines)[number] | undefined, color: string): void => {
+    const uci = line?.pv[0];
+    if (uci && uci.length >= 4) arrows.push({ from: uci.slice(0, 2), to: uci.slice(2, 4), color });
+  };
+  if (display.bestArrow) add(stored.lines[0], '#9a3b3b');
+  if (display.extraArrows) {
+    add(stored.lines[1], '#2f6fdf');
+    add(stored.lines[2], '#2f6fdf');
+  }
+  board.setArrows(arrows);
 }
 
 /**
@@ -186,6 +295,7 @@ function applyDisplaySettings(): void {
   reviewMain.classList.toggle('hide-best-arrow', !display.bestArrow);
   reviewMain.classList.toggle('hide-extra-arrows', !display.extraArrows);
   evalBar.setFlipped(display.evalFollowFlip && flipped);
+  paintArrows();
 }
 
 // 支持从摆棋页带着局面跳转过来
@@ -195,12 +305,24 @@ if (fenParam) {
   if (error) showNote(error);
 }
 
-// 从对弈页跳转过来：读取刚才那盘棋的 PGN（用时另存在 sessionStorage，供之后画用时图）
-if (new URLSearchParams(location.search).get('fromPlay')) {
+// 从对弈页跳转过来：读取刚才那盘棋的 PGN 与每步用时
+const fromPlay = Boolean(new URLSearchParams(location.search).get('fromPlay'));
+const playTimes: number[] = [];
+if (fromPlay) {
+  const rawTimes = sessionStorage.getItem('jxchess.play.times');
+  if (rawTimes) {
+    try {
+      const parsed = JSON.parse(rawTimes) as number[];
+      if (Array.isArray(parsed)) playTimes.push(...parsed);
+    } catch {
+      // 用时数据损坏时忽略，图表按无数据展示
+    }
+  }
   const pgn = sessionStorage.getItem('jxchess.play.pgn');
   if (pgn) {
     const error = state.loadPgn(pgn);
     if (error) showNote(error);
+    else resetAnalysisPanel();
   }
 }
 
@@ -292,12 +414,18 @@ function refresh(play: MovePlayed | null): void {
   renderCaptured();
   renderResult();
   updateBranchButtons();
-  paintMoveScores();
-  paintAnnotations();
+  // 深度分析进行中不逐手刷新评分/标注，等整局完成统一更新
+  if (!analysis.isScanning()) {
+    paintMoveScores();
+    paintAnnotations();
+    paintStoredAnalysis();
+    renderStatsAndChart();
+    paintArrows();
+  }
 
   // 逐手分析默认开启：每换一个局面就从浅到深重新算
   if (display.autoAnalyze && window.__TAURI__) {
-    void analysis.analyze(chess.fen()).catch(() => {
+    void analysis.analyze(chess.fen(), !state.imported || panelRevealed).catch(() => {
       // 引擎启动失败时保持界面可用，错误在用户点“分析本局”时提示
     });
   }
@@ -306,7 +434,10 @@ function refresh(play: MovePlayed | null): void {
 function loadPgnText(text: string): void {
   const error = state.loadPgn(text);
   if (error) showNote(error);
-  else refresh(null);
+  else {
+    resetAnalysisPanel();
+    refresh(null);
+  }
 }
 
 function downloadPgn(): void {
@@ -417,28 +548,31 @@ btnDeleteBranch.addEventListener('click', () => {
   refresh(null);
 });
 
-// 分析本局：把主线每一手之后的局面依次跑一遍（逐手分析本身已默认开启）
+// 分析本局：逐手深度分析，按钮换成进度条，蒙版保持到完成
 btnAnalyze.addEventListener('click', async () => {
   const fens = state.mainFens();
   if (fens.length < 2) {
     showNote('当前还没有棋谱，先导入棋谱或走几步。');
     return;
   }
-  btnAnalyze.disabled = true;
+  btnAnalyze.hidden = true;
+  analysisProgress.hidden = false;
+  setAnalysisProgress(0, fens.length);
   try {
-    await analysis.scanGame(fens, (done, total) => {
-      btnAnalyze.textContent = `分析中 ${done}/${total}`;
-    });
+    await analysis.scanGame(fens, (done, total) => setAnalysisProgress(done, total));
+    panelRevealed = true;
     paintMoveScores();
     paintAnnotations();
+    paintStoredAnalysis();
     renderStatsAndChart();
+    paintArrows();
+    // 完成后直接露出分析栏，不弹窗
     analysisMask.classList.add('hidden');
-    showNote(`整局分析完成，共 ${fens.length - 1} 手。`);
+    analysisProgress.hidden = true;
   } catch (error) {
     showNote(`整局分析失败：${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    btnAnalyze.disabled = false;
-    btnAnalyze.textContent = '分析本局';
+    analysisProgress.hidden = true;
+    btnAnalyze.hidden = false;
   }
 });
 
@@ -454,6 +588,7 @@ btnChartToggle.addEventListener('click', () => {
   chartBody.classList.toggle('timing', timingView);
   chartTitle.textContent = timingView ? '用时分析' : '局面走势';
   btnChartToggle.title = timingView ? '切换为局面走势' : '切换为用时分析';
+  renderStatsAndChart();
 });
 
 // 窄屏抽屉：点顶栏「分析」展开/收起，Esc 关闭
@@ -465,4 +600,5 @@ window.addEventListener('keydown', (e) => {
 });
 
 applyDisplaySettings();
+syncAnalysisMask();
 refresh(null);

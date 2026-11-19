@@ -10,16 +10,23 @@
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body class="page home">
+  <!-- 开屏动画：只在每次启动首次进入首页时播放，可点击跳过 -->
+  <div class="splash" id="splash" aria-hidden="true">
+    <div class="splash-scene">
+      <div class="splash-logo">
+        <div class="splash-ink"><i></i><i></i><i></i></div>
+        <div class="splash-logo-clip"><img src="./logo.svg" alt="" draggable="false" /></div>
+        <div class="splash-brush"></div>
+      </div>
+      <div class="splash-word">JXCHESS</div>
+      <div class="splash-progress"><span></span></div>
+    </div>
+  </div>
+
   <!-- 飘落的棋子背景由 home.ts 随机生成，纯装饰 -->
   <div class="sky" aria-hidden="true"></div>
 
   <main class="home-stage">
-    <div class="home-center">
-      <div class="home-logo"><img src="./logo.svg" alt="JXchess logo" width="150" height="150" draggable="false" /></div>
-      <h1 class="home-title">JXchess</h1>
-      <p class="home-sub">开源免费的国际象棋工具</p>
-    </div>
-
     <div class="home-entries">
       <a class="entry" href="./review.html">
         <img src="./pieces/wK.svg" alt="" width="46" height="46" draggable="false" />

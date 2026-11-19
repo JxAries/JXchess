@@ -1,14 +1,14 @@
 /**
- * 对弈页入口：选择时间限制后与本地 Stockfish 对弈。
- * 玩家执白；双方各有时钟，走一步加一次秒；记录每一步用时（毫秒）供之后画用时图。
- * 对局结束可把 PGN 与用时写入 sessionStorage，跳到复盘页继续分析。
+ * 对弈页入口：先选人机/人人，再选时间限制。
+ * 人机：玩家执白对本地 Stockfish（每步隔 3 秒应招）；人人：同一台电脑轮流走。
+ * 双方各有时钟、走棋加秒，并记录每一步用时（毫秒）供复盘页画用时柱状图。
  */
 import { Chess, type Square } from 'chess.js';
 import { BoardView } from '../board/boardView';
 import { askPromotion } from '../panels/promotion';
 import { openAlert } from '../panels/dialog';
 import { bestMove, startEngine, stopSearch } from '../engine/client';
-import type { PieceKind } from '../game/types';
+import { pieceImage, type PieceKind } from '../game/types';
 
 function must<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -23,23 +23,26 @@ const clockWhiteEl = must('clock-white');
 const clockBlackEl = must('clock-black');
 const clockWhiteRow = must('clock-white-row');
 const clockBlackRow = must('clock-black-row');
-const statusEl = must('play-status');
+const nameWhiteEl = must('name-white');
+const nameBlackEl = must('name-black');
+const capWhiteEl = must('cap-white');
+const capBlackEl = must('cap-black');
 const resultEl = must('result');
 const resultTitle = must('result-title');
 const resultText = must('result-text');
 
-/** 玩家固定执白；引擎执黑 */
-const PLAYER: 'w' = 'w';
-const ENGINE: 'b' = 'b';
-/** 引擎每步思考时间（毫秒），对弈不追求强度 */
+type Mode = 'engine' | 'human';
+/** 引擎每步思考时间（毫秒）；另外在应招前固定等待 3 秒，避免瞬间回子 */
 const ENGINE_MOVETIME = 700;
+const ENGINE_DELAY = 3000;
 
+let mode: Mode = 'engine';
 let board: BoardView | null = null;
 let chess = new Chess();
 let baseMs = 300000;
 let incMs = 0;
 let clocks = { w: baseMs, b: baseMs };
-let active: 'w' | 'b' = PLAYER;
+let active: 'w' | 'b' = 'w';
 let over = false;
 let busy = false;
 let timer = 0;
@@ -60,12 +63,8 @@ function formatClock(ms: number): string {
 function updateClocks(): void {
   clockWhiteEl.textContent = formatClock(clocks.w);
   clockBlackEl.textContent = formatClock(clocks.b);
-  clockWhiteRow.classList.toggle('active', !over && active === PLAYER);
-  clockBlackRow.classList.toggle('active', !over && active === ENGINE);
-}
-
-function setStatus(text: string): void {
-  statusEl.textContent = text;
+  clockWhiteRow.classList.toggle('active', !over && active === 'w');
+  clockBlackRow.classList.toggle('active', !over && active === 'b');
 }
 
 function kingSquare(color: 'w' | 'b'): string | null {
@@ -79,6 +78,29 @@ function kingSquare(color: 'w' | 'b'): string | null {
   return null;
 }
 
+/** 双方得子：白方吃到的黑子放白方条，黑方吃到的白子放黑方条 */
+function renderCaptured(): void {
+  const byWhite: PieceKind[] = [];
+  const byBlack: PieceKind[] = [];
+  for (const move of chess.history({ verbose: true })) {
+    if (!move.captured) continue;
+    if (move.color === 'w') byWhite.push(move.captured as PieceKind);
+    else byBlack.push(move.captured as PieceKind);
+  }
+  const draw = (el: HTMLElement, kinds: PieceKind[], color: 'w' | 'b'): void => {
+    el.textContent = '';
+    for (const kind of kinds) {
+      const img = document.createElement('img');
+      img.src = pieceImage(color, kind);
+      img.alt = '';
+      img.draggable = false;
+      el.appendChild(img);
+    }
+  };
+  draw(capWhiteEl, byWhite, 'b');
+  draw(capBlackEl, byBlack, 'w');
+}
+
 function renderBoard(): void {
   if (!board) return;
   board.render(chess);
@@ -87,6 +109,7 @@ function renderBoard(): void {
   board.clearAnnotations();
   if (lastMove) board.markLastMove(lastMove.from, lastMove.to);
   if (chess.inCheck()) board.markCheck(kingSquare(chess.turn()));
+  renderCaptured();
 }
 
 function selectSquare(sq: Square): void {
@@ -111,9 +134,14 @@ function clearSelection(): void {
   board?.clearMarks();
 }
 
-function isPlayerPiece(sq: string): boolean {
+/** 当前这一方是否由人来走：人机模式只有白方，人人模式双方都可 */
+function humanCanMove(side: 'w' | 'b'): boolean {
+  return mode === 'human' || side === 'w';
+}
+
+function isMovablePiece(sq: string): boolean {
   const piece = chess.get(sq as Square);
-  return Boolean(piece && piece.color === PLAYER);
+  return Boolean(piece && piece.color === active && humanCanMove(active));
 }
 
 /** 记录一步用时，并切换到对方计时 */
@@ -122,7 +150,7 @@ function recordMove(side: 'w' | 'b'): void {
   moveTimes.push(Math.round(now - turnStart));
   clocks[side] += incMs;
   turnStart = now;
-  active = side === PLAYER ? ENGINE : PLAYER;
+  active = side === 'w' ? 'b' : 'w';
   updateClocks();
 }
 
@@ -136,12 +164,10 @@ function finish(reason: 'checkmate' | 'draw' | 'timeout'): void {
   let title = '对局结束';
   let text = '';
   if (reason === 'timeout') {
-    const winner = active === PLAYER ? '黑方' : '白方';
-    title = `${winner}获胜`;
+    title = `${active === 'w' ? '黑方' : '白方'}获胜`;
     text = '对方超时。';
   } else if (chess.isCheckmate()) {
-    const winner = chess.turn() === 'w' ? '黑方' : '白方';
-    title = `${winner}获胜`;
+    title = `${chess.turn() === 'w' ? '黑方' : '白方'}获胜`;
     text = '将死。';
   } else {
     title = '平局';
@@ -159,11 +185,12 @@ function checkGameOver(): boolean {
 }
 
 async function playMove(from: string, to: string): Promise<void> {
-  if (over || busy || active !== PLAYER) return;
+  if (over || busy || !humanCanMove(active)) return;
+  const mover = active;
   const hit = targets.find((t) => t.to === to && t.promotion);
   let promotion: PieceKind | undefined;
   if (hit) {
-    const choice = await askPromotion(PLAYER);
+    const choice = await askPromotion(mover);
     if (!choice) {
       clearSelection();
       return;
@@ -181,19 +208,21 @@ async function playMove(from: string, to: string): Promise<void> {
     clearSelection();
     return;
   }
-  recordMove(PLAYER);
+  recordMove(mover);
   lastMove = { from: move.from, to: move.to };
   clearSelection();
   renderBoard();
   if (checkGameOver()) return;
-  setStatus('鳕鱼思考中…');
-  void engineTurn();
+  if (mode === 'engine' && active === 'b') void engineTurn();
 }
 
 async function engineTurn(): Promise<void> {
-  if (over) return;
+  if (over || mode !== 'engine') return;
   busy = true;
   try {
+    // 至少隔 3 秒再应招，避免对局看起来像“瞬间回子”
+    await new Promise((resolve) => window.setTimeout(resolve, ENGINE_DELAY));
+    if (over) return;
     const uci = await bestMove(chess.fen(), ENGINE_MOVETIME);
     if (over) return;
     let move;
@@ -203,11 +232,10 @@ async function engineTurn(): Promise<void> {
       throw new Error('引擎返回了不合法的着法');
     }
     if (!move) throw new Error('引擎返回了不合法的着法');
-    recordMove(ENGINE);
+    recordMove('b');
     lastMove = { from: move.from, to: move.to };
     renderBoard();
     if (checkGameOver()) return;
-    setStatus('轮到你走棋');
   } catch (error) {
     over = true;
     window.clearInterval(timer);
@@ -218,9 +246,10 @@ async function engineTurn(): Promise<void> {
 }
 
 function onPick(sq: Square): void {
-  if (over || busy || active !== PLAYER) return;
+  if (over || busy) return;
+  if (!humanCanMove(active)) return;
   if (!selected) {
-    if (isPlayerPiece(sq)) selectSquare(sq);
+    if (isMovablePiece(sq)) selectSquare(sq);
     return;
   }
   if (sq === selected) {
@@ -232,7 +261,7 @@ function onPick(sq: Square): void {
     void playMove(selected, sq);
     return;
   }
-  if (isPlayerPiece(sq)) selectSquare(sq);
+  if (isMovablePiece(sq)) selectSquare(sq);
   else clearSelection();
 }
 
@@ -241,17 +270,14 @@ function ensureBoard(): void {
   board = new BoardView(boardEl);
   board.onPick = (sq) => onPick(sq as Square);
   board.setDragHandlers({
-    canStart: (sq) => !over && !busy && active === PLAYER && isPlayerPiece(sq),
+    canStart: (sq) => !over && !busy && isMovablePiece(sq),
     canDrop: (from, to) => chess.moves({ square: from as Square, verbose: true }).some((m) => m.to === to),
     onDrop: (from, to) => {
-      // 拖拽时也需要先亮出该子的合法落点，才能处理升变
-      const piece = chess.get(from as Square);
-      if (piece && piece.color === PLAYER) selectSquare(from as Square);
+      if (isMovablePiece(from)) selectSquare(from as Square);
       void playMove(from, to);
     },
     onDragStart: (from) => {
-      const piece = chess.get(from as Square);
-      if (piece && piece.color === PLAYER) selectSquare(from as Square);
+      if (isMovablePiece(from)) selectSquare(from as Square);
     },
     onDragEnd: () => clearSelection(),
   });
@@ -262,13 +288,16 @@ function startGame(nextBase: number, nextInc: number): void {
   incMs = nextInc;
   chess = new Chess();
   clocks = { w: baseMs, b: baseMs };
-  active = PLAYER;
+  active = 'w';
   over = false;
   busy = false;
   moveTimes = [];
   lastMove = null;
   selected = null;
   targets = [];
+
+  nameWhiteEl.textContent = mode === 'engine' ? '白方 · 你' : '白方';
+  nameBlackEl.textContent = mode === 'engine' ? '黑方 · Stockfish' : '黑方';
 
   setupEl.hidden = true;
   gameEl.hidden = false;
@@ -278,7 +307,6 @@ function startGame(nextBase: number, nextInc: number): void {
   board?.setFlipped(false);
   renderBoard();
   updateClocks();
-  setStatus('轮到你走棋');
 
   const now = performance.now();
   turnStart = now;
@@ -297,37 +325,40 @@ function startGame(nextBase: number, nextInc: number): void {
       updateClocks();
     }
   }, 100);
+
+  if (mode === 'engine') {
+    // 预热引擎，避免第一步额外等待
+    void startEngine().catch(() => undefined);
+  }
 }
 
-function stopGame(): void {
-  over = true;
-  window.clearInterval(timer);
-  setupEl.hidden = false;
-  gameEl.hidden = true;
-  resultEl.hidden = true;
-}
+// 人机 / 人人选择
+document.querySelectorAll<HTMLButtonElement>('.mode-option').forEach((button) => {
+  button.addEventListener('click', () => {
+    mode = button.dataset.mode === 'human' ? 'human' : 'engine';
+    document.querySelectorAll('.mode-option').forEach((el) => el.classList.toggle('selected', el === button));
+  });
+});
 
 // 时间限制按钮
 document.querySelectorAll<HTMLButtonElement>('.time-option').forEach((button) => {
   button.addEventListener('click', () => {
     startGame(Number(button.dataset.base ?? 300000), Number(button.dataset.inc ?? 0));
-    // 预热引擎，避免第一步等待
-    void startEngine().catch(() => undefined);
   });
 });
 
-must('btn-back').addEventListener('click', stopGame);
 must('btn-again').addEventListener('click', () => startGame(baseMs, incMs));
 must('btn-review').addEventListener('click', () => {
   window.clearInterval(timer);
-  // 写进 PGN 头，复盘页就能显示双方名字
-  chess.header('White', '你', 'Black', 'Stockfish');
+  if (mode === 'engine') chess.header('White', '你', 'Black', 'Stockfish');
+  else chess.header('White', '白方', 'Black', '黑方');
   sessionStorage.setItem('jxchess.play.pgn', chess.pgn());
   sessionStorage.setItem('jxchess.play.times', JSON.stringify(moveTimes));
+  sessionStorage.setItem('jxchess.play.mode', mode);
   location.href = './review.html?fromPlay=1';
 });
 
-// 离开页面前停掉引擎搜索，避免复盘页启动时拿到旧的 bestmove
+// 离开页面前停掉引擎搜索
 window.addEventListener('beforeunload', () => {
   void stopSearch();
 });

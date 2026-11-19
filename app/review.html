@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- 复盘页：左侧分析面板、中间棋盘（右侧评估条、上下得子）、右侧棋谱面板。
      窄屏（<1180px）时左面板收进抽屉，点顶栏「分析」展开。 -->
 <html lang="zh-CN">
@@ -19,6 +19,7 @@
       <a class="nav-link" href="./index.html">首页</a>
       <a class="nav-link active" href="./review.html">复盘</a>
       <a class="nav-link" href="./editor.html">摆棋</a>
+      <a class="nav-link" href="./play.html">对弈</a>
     </nav>
     <div class="spacer"></div>
     <button id="btn-analysis-drawer" class="btn drawer-toggle" type="button" title="展开分析面板">分析</button>
@@ -34,12 +35,12 @@
           <!-- 引擎一选 / 二选 -->
           <div class="engine-lines">
             <div class="engine-line">
-              <span class="engine-rank">1</span>
+              <span class="engine-rank">一选</span>
               <span class="engine-score" id="engine-score-1">—</span>
               <span class="engine-pv" id="engine-pv-1">未分析</span>
             </div>
             <div class="engine-line">
-              <span class="engine-rank">2</span>
+              <span class="engine-rank">二选</span>
               <span class="engine-score" id="engine-score-2">—</span>
               <span class="engine-pv" id="engine-pv-2">未分析</span>
             </div>
@@ -95,10 +96,13 @@
           <div class="ai-card"><span>AI 讲棋 · 开发中</span></div>
         </div>
 
-        <!-- 未分析时的蒙版 -->
+        <!-- 未分析时的蒙版；点击按钮后按钮换成进度条，蒙版保持到分析完成 -->
         <div class="analysis-mask" id="analysis-mask">
           <button class="btn primary" id="btn-analyze" type="button">分析本局</button>
-          <p class="analysis-hint">引擎将在后续版本接入</p>
+          <div class="analysis-progress" id="analysis-progress" hidden>
+            <div class="analysis-progress-track"><div class="analysis-progress-fill" id="analysis-progress-fill"></div></div>
+            <span class="analysis-progress-label" id="analysis-progress-label">0%</span>
+          </div>
         </div>
       </div>
     </aside>

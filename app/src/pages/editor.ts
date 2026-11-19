@@ -89,7 +89,41 @@ function setMode(next: Mode): void {
   mode = next;
   clearSelect();
   syncModeUI();
+  syncPlaceCursor();
 }
+
+/**
+ * 选中要放置的棋子后，把鼠标光标换成该棋子的样式（类似首页的棋子光标）。
+ * 只跟随指针位置，不做跳跃/游走动画；选择与擦除模式恢复系统光标。
+ */
+const placeCursor = document.createElement('img');
+placeCursor.className = 'place-cursor';
+placeCursor.alt = '';
+placeCursor.draggable = false;
+document.body.appendChild(placeCursor);
+const cursorPos = { x: -100, y: -100 };
+
+function movePlaceCursor(): void {
+  placeCursor.style.transform = `translate(${cursorPos.x}px, ${cursorPos.y}px) translate(-50%, -50%)`;
+}
+
+function syncPlaceCursor(): void {
+  if (mode.kind === 'place') {
+    placeCursor.src = pieceImage(mode.color, mode.piece);
+    placeCursor.style.opacity = '1';
+    document.body.classList.add('placing-piece');
+  } else {
+    placeCursor.style.opacity = '0';
+    document.body.classList.remove('placing-piece');
+  }
+  movePlaceCursor();
+}
+
+window.addEventListener('pointermove', (e) => {
+  cursorPos.x = e.clientX;
+  cursorPos.y = e.clientY;
+  movePlaceCursor();
+});
 
 function syncModeUI(): void {
   must('btn-select').classList.toggle('selected', mode.kind === 'select');
@@ -257,4 +291,5 @@ must('btn-review').addEventListener('click', () => {
 editor.setClassic();
 syncModeUI();
 syncOptionsUI();
+syncPlaceCursor();
 refreshKingState();

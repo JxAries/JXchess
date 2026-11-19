@@ -1,4 +1,4 @@
-﻿/* JXchess v0.1 全局样式：报纸风（Newspaper）。
+/* JXchess v0.1 全局样式：报纸风（Newspaper）。
    要点：棋盘用极浅两色 + 细线分格而不靠大色块；界面以暖灰纸色为主；
    只保留一种低饱和深红作为强调色；按钮统一为细边框幽灵样式；全局禁止选中与原生拖图。
 
@@ -33,6 +33,8 @@
 }
 
 * { box-sizing: border-box; }
+/* hidden 属性必须真的隐藏：部分组件类设置了 display:flex，会盖过浏览器默认样式 */
+[hidden] { display: none !important; }
 
 html, body { height: 100%; }
 
@@ -174,20 +176,21 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   top: 0;
   right: 2px;
   z-index: 5;
-  font-size: clamp(10px, 1.5vw, 15px);
+  font-size: clamp(12px, 1.8vw, 18px);
   font-weight: 700;
   line-height: 1.1;
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.7);
 }
-.sq .annotation.kind-brilliant { color: #2f7d8e; }
-.sq .annotation.kind-best { color: #8a6b1f; }
-.sq .annotation.kind-good { color: #3f7a4f; }
+.sq .annotation.kind-brilliant { color: #1f4fd8; }
+.sq .annotation.kind-best { color: #c9a227; }
+.sq .annotation.kind-good { color: #2f6fdf; }
 .sq .annotation.kind-normal { color: #8b857c; }
-.sq .annotation.kind-inaccuracy { color: #a07a2c; }
-.sq .annotation.kind-mistake { color: #a25a3a; }
-.sq .annotation.kind-blunder { color: #9c3b3b; }
-.sq .annotation.kind-mate { color: #9c3b3b; font-size: clamp(13px, 1.8vw, 18px); }
+.sq .annotation.kind-inaccuracy { color: #e08a1e; }
+.sq .annotation.kind-mistake { color: #e05a1e; }
+.sq .annotation.kind-blunder { color: #d62828; }
+.sq .annotation.kind-mate { color: #d62828; font-size: clamp(14px, 2vw, 20px); }
+.sq .annotation.kind-draw { color: #6b665e; font-size: clamp(14px, 2vw, 20px); }
 
 /* 拖拽时跟随鼠标的棋子 */
 .piece.drag-ghost {
@@ -685,7 +688,8 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   border-radius: 3px;
   background: transparent;
 }
-.evalbar-score { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.evalbar-state { font-weight: 600; }
+.evalbar-score { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 /* 白段上的文字用深色，黑段上的文字用浅色，均势保留原来的深底白字 */
 .evalbar-text.on-w span { color: #2b2a28; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45); }
 .evalbar-text.on-b span { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55); }
@@ -713,7 +717,7 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
   font-size: 12px;
   min-width: 0;
 }
-.engine-rank { width: 12px; color: var(--ink-2); flex-shrink: 0; }
+.engine-rank { width: 28px; font-size: 10px; font-weight: 600; color: var(--ink); flex-shrink: 0; }
 .engine-score {
   min-width: 40px;
   padding: 1px 4px;
@@ -736,8 +740,9 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .engine-pv::-webkit-scrollbar { display: none; }
 
 .chart-card {
-  flex: 1 1 150px;
-  min-height: 120px;
+  flex: 0 0 150px;
+  height: 150px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
@@ -765,14 +770,14 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .chart-body { flex: 1; min-height: 0; }
 .chart-svg { display: block; width: 100%; height: 100%; }
 .chart-bars { display: none; }
-.chart-body.timing .chart-line { display: none; }
+.chart-body.timing .chart-line { display: block; }
 .chart-body.timing .chart-bars { display: block; }
 /* 用时数据缺失时的空状态 */
 .chart-empty { display: none; margin: 0; padding: 14px 10px; font-size: 11px; line-height: 1.6; color: var(--ink-2); text-align: center; }
-.chart-body.timing .chart-empty { display: block; }
+.chart-empty.show { display: block; }
 
 .stats-card {
-  flex: 1 1 200px;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   gap: 10px;
@@ -830,8 +835,8 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .mark-blunder { color: #9c3b3b; }
 
 .ai-card {
-  flex: 1 1 90px;
-  min-height: 56px;
+  flex: 1 1 auto;
+  min-height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1013,3 +1018,234 @@ h1, h2, h3 { font-family: Garamond, "Times New Roman", "Songti SC", Georgia, ser
 .result-card h2 { margin: 0 0 8px; font-size: 20px; font-weight: 500; }
 .result-card p { margin: 0; font-size: 13px; color: var(--ink-2); }
 .result-card .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+
+/* ================= 摆棋：选中棋子后的棋子光标 ================= */
+.place-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  filter: drop-shadow(0 2px 4px rgba(43, 42, 40, 0.3));
+}
+body.placing-piece,
+body.placing-piece * { cursor: none; }
+
+/* ================= 对弈：模式选择 ================= */
+.mode-options { display: flex; gap: 10px; margin: 4px 0 20px; }
+.mode-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.mode-option:hover { border-color: var(--accent); }
+.mode-option.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.mode-option strong { font-size: 15px; font-weight: 600; }
+.mode-option span { font-size: 11px; color: var(--ink-2); }
+.mode-option.selected span { color: var(--accent); }
+
+/* 对局信息条里的得子 */
+.clock-caps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-left: 10px;
+}
+.clock-caps img {
+  width: 18px;
+  height: 18px;
+  margin-left: -6px;
+  flex-shrink: 0;
+}
+.clock-caps img:first-child { margin-left: 0; }
+
+/* 深度分析进度条：点击“分析本局”后替换按钮，蒙版保持到完成 */
+.analysis-progress { width: 72%; max-width: 220px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.analysis-progress-track { width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.analysis-progress-fill { width: 0; height: 100%; background: var(--accent); transition: width 0.15s ease; }
+.analysis-progress-label { font-size: 11px; color: var(--ink-2); }
+
+/* 引擎推荐箭头：覆盖在棋子之上，半透明、不拦截鼠标 */
+.board-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* ================= 开屏动画（仅首页，每次启动一次） ================= */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 95% at 50% 42%, #f8f5ee 0%, #f2eee5 55%, #e7e0d3 100%);
+  transition: opacity 0.4s ease;
+}
+.splash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(40, 36, 30, 0.045) 0.55px, transparent 0.65px),
+    radial-gradient(rgba(255, 255, 255, 0.5) 0.5px, transparent 0.6px);
+  background-size: 5px 5px, 7px 7px;
+  background-position: 0 0, 2px 3px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.splash-out { opacity: 0; pointer-events: none; }
+
+.splash-scene {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 3vh, 30px);
+}
+.splash-logo {
+  position: relative;
+  width: clamp(220px, min(34vh, 30vw), 420px);
+  aspect-ratio: 1;
+  filter: drop-shadow(0 16px 24px rgba(28, 27, 25, 0.2));
+  animation: splashLogoIn 3s cubic-bezier(0.55, 0.06, 0.3, 1) both;
+}
+/* 阴影放在外层，裁剪放在内层：logo 从左到右成形时，下方阴影不会被切出横线 */
+.splash-logo-clip {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  clip-path: inset(0 100% 0 0);
+  animation: splashLogoClip 3s cubic-bezier(0.55, 0.06, 0.3, 1) both;
+}
+.splash-logo-clip img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.splash-brush {
+  position: absolute;
+  z-index: 2;
+  top: 4%;
+  bottom: 4%;
+  left: 0;
+  width: 2px;
+  opacity: 0;
+  background: linear-gradient(180deg, transparent, rgba(25, 24, 23, 0.75) 18%, rgba(25, 24, 23, 0.9) 50%, rgba(25, 24, 23, 0.75) 82%, transparent);
+  filter: blur(0.3px);
+  animation: splashBrush 3s cubic-bezier(0.55, 0.06, 0.3, 1) both;
+}
+.splash-ink {
+  position: absolute;
+  z-index: 0;
+  inset: -18%;
+  filter: blur(18px);
+  pointer-events: none;
+}
+.splash-ink i {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  mix-blend-mode: multiply;
+  animation: splashInk 3s ease-out both;
+}
+.splash-ink i:nth-child(1) {
+  width: 64%; height: 60%; left: 18%; top: 20%;
+  background: radial-gradient(circle at 42% 38%, rgba(28, 27, 25, 0.4), rgba(28, 27, 25, 0.12) 52%, transparent 70%);
+}
+.splash-ink i:nth-child(2) {
+  width: 46%; height: 40%; left: 6%; top: 46%;
+  background: radial-gradient(circle at 50% 50%, rgba(28, 27, 25, 0.28), transparent 68%);
+  animation-delay: 0.12s;
+}
+.splash-ink i:nth-child(3) {
+  width: 38%; height: 34%; right: 2%; top: 18%;
+  background: radial-gradient(circle at 50% 50%, rgba(28, 27, 25, 0.2), transparent 70%);
+  animation-delay: 0.22s;
+}
+
+.splash-word {
+  z-index: 2;
+  font-family: "Cormorant Garamond", "Baskerville", Georgia, serif;
+  font-size: clamp(24px, 2.4vw, 40px);
+  letter-spacing: 0.3em;
+  padding-left: 0.3em;
+  color: var(--ink);
+  opacity: 0;
+  animation: splashWord 3s ease-out both;
+  white-space: nowrap;
+}
+.splash-progress {
+  z-index: 2;
+  width: clamp(140px, 20vw, 240px);
+  height: 2px;
+  background: rgba(43, 42, 40, 0.12);
+  overflow: hidden;
+}
+.splash-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  animation: splashProgress 2.4s 0.3s cubic-bezier(0.3, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes splashLogoIn {
+  0%   { opacity: 0; transform: scale(0.96); }
+  15%  { opacity: 1; }
+  65%, 100% { opacity: 1; transform: scale(1); }
+}
+@keyframes splashLogoClip {
+  0%, 6%   { clip-path: inset(0 100% 0 0); }
+  55%, 100% { clip-path: inset(0 0 0 0); }
+}
+@keyframes splashBrush {
+  0%, 6% { left: 0; opacity: 0; }
+  8%     { left: 0; opacity: 0.8; }
+  52%    { left: 100%; opacity: 0.8; }
+  56%, 100% { left: 100%; opacity: 0; }
+}
+@keyframes splashInk {
+  0%   { opacity: 0; transform: scale(0.55); }
+  20%  { opacity: 0.48; transform: scale(1.02); }
+  46%  { opacity: 0.14; transform: scale(1.08); }
+  70%, 100% { opacity: 0; transform: scale(1.12); }
+}
+@keyframes splashWord {
+  0%, 40% { opacity: 0; transform: translateY(14px); }
+  60%     { opacity: 1; transform: translateY(0); }
+  100%    { opacity: 1; transform: translateY(0); }
+}
+@keyframes splashProgress {
+  0%   { width: 0; }
+  100% { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash { display: none; }
+}

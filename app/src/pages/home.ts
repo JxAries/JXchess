@@ -1,7 +1,8 @@
-/**
+﻿/**
  * 首页入口：生成密度更高、位置与角度随机、且缓慢旋转的飘落棋子背景，并启用棋子光标特效。
  */
 import { initChessCursor } from '../effects/cursor';
+import { initSplash } from '../splash';
 
 /** 背景飘落棋子：数量、横向位置、大小、时长与倾角均随机，避免出现规律与空白 */
 function buildFallingPieces(): void {
@@ -31,5 +32,6 @@ function buildFallingPieces(): void {
   sky.appendChild(fragment);
 }
 
+initSplash();
 buildFallingPieces();
 initChessCursor();

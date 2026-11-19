@@ -21,6 +21,12 @@ export interface DragHandlers {
   onDragEnd?(): void;
 }
 
+export interface BoardArrow {
+  from: string;
+  to: string;
+  color: string;
+}
+
 export class BoardView {
   readonly root: HTMLElement;
   /** 是否上下翻转，翻转后黑方在下 */
@@ -31,6 +37,8 @@ export class BoardView {
   private cells = new Map<SquareName, HTMLDivElement>();
   private imgs = new Map<SquareName, HTMLImageElement>();
   private annotations = new Map<SquareName, HTMLElement>();
+  private arrows: BoardArrow[] = [];
+  private arrowLayer: SVGSVGElement | null = null;
   private drag: DragHandlers | null = null;
   private dragFrom: string | null = null;
   private dragGhost: HTMLImageElement | null = null;
@@ -41,6 +49,7 @@ export class BoardView {
     this.root.className = 'board';
     container.appendChild(this.root);
     this.buildCells();
+    this.arrowLayer = this.createArrowLayer();
     this.wireDrag();
   }
 
@@ -53,6 +62,8 @@ export class BoardView {
     this.annotations.clear();
     this.root.textContent = '';
     this.buildCells();
+    this.arrowLayer = this.createArrowLayer();
+    this.drawArrows();
   }
 
   private buildCells(): void {
@@ -308,14 +319,101 @@ export class BoardView {
     }
   }
 
+  /** 设置引擎推荐箭头（覆盖在棋子之上，半透明） */
+  setArrows(arrows: readonly BoardArrow[]): void {
+    this.arrows = [...arrows];
+    this.drawArrows();
+  }
+
+  clearArrows(): void {
+    this.arrows = [];
+    this.drawArrows();
+  }
+
+  private createArrowLayer(): SVGSVGElement {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('board-arrows');
+    svg.setAttribute('viewBox', '0 0 8 8');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('aria-hidden', 'true');
+    this.root.appendChild(svg);
+    return svg;
+  }
+
+  private squarePoint(sq: string): { x: number; y: number } | null {
+    const file = FILES.indexOf(sq[0]);
+    const rank = Number(sq[1]);
+    if (file < 0 || !Number.isInteger(rank) || rank < 1 || rank > 8) return null;
+    return {
+      x: (this.flip ? 8 - file : file + 1) - 0.5,
+      y: (this.flip ? rank : 9 - rank) - 0.5,
+    };
+  }
+
+  private drawArrows(): void {
+    const svg = this.arrowLayer;
+    if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const ns = 'http://www.w3.org/2000/svg';
+    for (const arrow of this.arrows) {
+      const from = this.squarePoint(arrow.from);
+      const to = this.squarePoint(arrow.to);
+      if (!from || !to) continue;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.2) continue;
+      const ux = dx / len;
+      const uy = dy / len;
+      const start = { x: from.x + ux * 0.3, y: from.y + uy * 0.3 };
+      const tip = { x: to.x - ux * 0.28, y: to.y - uy * 0.28 };
+      const head = 0.32;
+      const half = 0.16;
+      const baseX = tip.x - ux * head;
+      const baseY = tip.y - uy * head;
+      // 直线画到三角形底边，三角尖再指向落点，避免线头穿过箭头造成错位
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', String(start.x));
+      line.setAttribute('y1', String(start.y));
+      line.setAttribute('x2', String(baseX));
+      line.setAttribute('y2', String(baseY));
+      line.setAttribute('stroke', arrow.color);
+      line.setAttribute('stroke-width', '0.14');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('opacity', '0.55');
+      svg.appendChild(line);
+
+      const points = [
+        `${tip.x},${tip.y}`,
+        `${baseX - uy * half},${baseY + ux * half}`,
+        `${baseX + uy * half},${baseY - ux * half}`,
+      ].join(' ');
+      const polygon = document.createElementNS(ns, 'polygon');
+      polygon.setAttribute('points', points);
+      polygon.setAttribute('fill', arrow.color);
+      polygon.setAttribute('opacity', '0.6');
+      svg.appendChild(polygon);
+    }
+  }
+
   /** 在棋子右上角显示逐手标注；传 null 或空文本相当于清空 */
   markAnnotation(sq: SquareName | null, text: string, kind: string): void {
+    if (!sq || !text) {
+      this.clearAnnotations();
+      return;
+    }
+    this.markAnnotations([{ sq, text, kind }]);
+  }
+
+  /** 一次显示多个标注（和棋时双方王上方都要显示 =） */
+  markAnnotations(items: ReadonlyArray<{ sq: SquareName; text: string; kind: string }>): void {
     this.clearAnnotations();
-    if (!sq || !text) return;
-    const el = this.annotations.get(sq);
-    if (!el) return;
-    el.textContent = text;
-    el.className = `annotation kind-${kind}`;
+    for (const item of items) {
+      const el = this.annotations.get(item.sq);
+      if (!el) continue;
+      el.textContent = item.text;
+      el.className = `annotation kind-${item.kind}`;
+    }
   }
 
   /**

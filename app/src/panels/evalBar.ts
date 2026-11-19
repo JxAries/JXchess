@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 评估条：位于棋盘右侧，与棋盘等高。
  * 方向与棋盘一致——默认白方在下、黑方在上；翻转棋盘后整条跟着翻。
  * 文字不再固定在正中：
@@ -105,7 +105,7 @@ export class EvalBar {
     }
     const cp = this.score.cp ?? 0;
     const abs = Math.abs(cp);
-    const lead = cp > 0 ? '白方' : '黑方';
+    const lead = cp > 0 ? '白' : '黑';
     if (abs < 50) return '均势';
     if (abs < 150) return `${lead}略优`;
     if (abs < 400) return `${lead}大优`;

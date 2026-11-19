@@ -28,6 +28,9 @@ export interface PositionAnalysis {
   lines: EngineLine[];
 }
 
+/** auto：当前局面快速分析，只喂评估条；deep：点“分析本局”后的逐手分析，喂左侧栏与棋谱评分 */
+export type AnalysisMode = 'auto' | 'deep';
+
 const START_DEPTH = 10;
 // 逐手分析默认开启：上限压到 18，避免长时间占满 CPU；停留越久越接近 18
 const MAX_DEPTH = 18;
@@ -70,60 +73,95 @@ export class AnalysisController {
   private currentDepth = 0;
   private timer = 0;
   private lastEmit = 0;
+  /** 每个局面的开始时间：0.2s 内的 info 不采用，避免走子瞬间评估条乱跳 */
+  private positionStart = 0;
   private scanning = false;
-  private onUpdate: (analysis: PositionAnalysis) => void;
-  /** 已算过的局面分（白方视角），键为 FEN，用于棋谱每步右侧的评分 */
-  private scores = new Map<string, { cp?: number; mate?: number }>();
+  private mode: AnalysisMode = 'auto';
+  private recordAuto = false;
+  private onUpdate: (analysis: PositionAnalysis, mode: AnalysisMode) => void;
+  /** 深度分析（点击“分析本局”）的结果；自动分析绝不写入这里 */
+  private deepScores = new Map<string, { cp?: number; mate?: number }>();
+  private deepAnalyses = new Map<string, PositionAnalysis>();
+  /** 自动分析结果：只有“无导入棋谱”或深度分析完成后的新着法才允许参与左侧栏 */
+  private autoScores = new Map<string, { cp?: number; mate?: number }>();
+  private autoAnalyses = new Map<string, PositionAnalysis>();
 
-  constructor(onUpdate: (analysis: PositionAnalysis) => void) {
+  constructor(onUpdate: (analysis: PositionAnalysis, mode: AnalysisMode) => void) {
     this.onUpdate = onUpdate;
     onEngineLine((line) => this.handleLine(line));
   }
 
-  /** 切到新局面前先停掉上一个分析 */
-  async analyze(fen: string): Promise<void> {
+  /** 自动分析；recordForPanel 为真时，结果也可以用于左侧栏（无导入棋谱 / 深度分析完成后的新着法） */
+  async analyze(fen: string, recordForPanel = false): Promise<void> {
     if (this.scanning) return;
-    await this.startPosition(fen);
+    this.recordAuto = recordForPanel;
+    await this.startPosition(fen, 'auto');
   }
 
-  /** 整局逐手分析：按顺序把每一手之后的局面各算一次（深度 10） */
+  /** 整局逐手分析：按顺序把每一手之后的局面各算一次，结果只进 deepScores / deepAnalyses */
   async scanGame(fens: readonly string[], onProgress?: (done: number, total: number) => void): Promise<void> {
     if (this.scanning) return;
     this.scanning = true;
+    const started = performance.now();
     try {
       await this.init();
       for (let i = 0; i < fens.length; i++) {
         const fen = fens[i];
-        if (!this.scores.has(fen)) {
-          await this.startPosition(fen);
-          // 等这一手出分（最多 2.5s，避免个别局面卡住整局）
-          for (let t = 0; t < 25; t++) {
-            if (this.scores.has(fen)) break;
+        if (!this.deepAnalyses.has(fen)) {
+          await this.startPosition(fen, 'deep');
+          // 等这一手出分（最多 3s，避免个别局面卡住整局）
+          for (let t = 0; t < 30; t++) {
+            if (this.deepAnalyses.has(fen)) break;
             await new Promise((resolve) => window.setTimeout(resolve, 100));
           }
         }
         onProgress?.(i + 1, fens.length);
+      }
+      // 整局深度分析至少 3 秒，避免短局点一下就结束、用户觉得没分析
+      const elapsed = performance.now() - started;
+      if (elapsed < 3000) {
+        await new Promise((resolve) => window.setTimeout(resolve, 3000 - elapsed));
       }
     } finally {
       this.scanning = false;
     }
   }
 
-  /** 某个局面的白方视角厘兵分；将杀按 ±1000 处理，没算过返回 undefined */
+  /** 是否正在逐手深度分析 */
+  isScanning(): boolean {
+    return this.scanning;
+  }
+
+  /** 清空分析结果（导入新棋局时调用） */
+  clearDeep(): void {
+    this.deepScores.clear();
+    this.deepAnalyses.clear();
+    this.autoScores.clear();
+    this.autoAnalyses.clear();
+  }
+
+  /** 某个局面的白方视角厘兵分；优先深度结果，其次允许的自动结果 */
   evalCp(fen: string): number | undefined {
-    const score = this.scores.get(fen);
+    const score = this.deepScores.get(fen) ?? this.autoScores.get(fen);
     if (!score) return undefined;
     if (score.mate !== undefined) return score.mate > 0 ? 1000 : -1000;
     return score.cp;
   }
 
-  private async startPosition(fen: string): Promise<void> {
-    if (this.fen === fen) return;
+  /** 取某个局面的完整分析（左栏推荐 / 评估条） */
+  analysisFor(fen: string, includeAuto: boolean): PositionAnalysis | undefined {
+    return this.deepAnalyses.get(fen) ?? (includeAuto ? this.autoAnalyses.get(fen) : undefined);
+  }
+
+  private async startPosition(fen: string, mode: AnalysisMode): Promise<void> {
+    if (this.fen === fen && this.mode === mode) return;
     await this.init();
     this.fen = fen;
+    this.mode = mode;
     this.turn = fen.split(' ')[1] === 'b' ? 'b' : 'w';
     this.lines.clear();
     this.currentDepth = 0;
+    this.positionStart = performance.now();
     window.clearTimeout(this.timer);
     try {
       await stopSearch();
@@ -132,12 +170,6 @@ export class AnalysisController {
     }
     await sendCommand(`position fen ${fen}`);
     await this.go(START_DEPTH);
-  }
-
-  /** 用户主动点“分析本局”时，从浅到深重新跑一遍当前局面 */
-  async restart(fen: string): Promise<void> {
-    this.fen = '';
-    await this.analyze(fen);
   }
 
   /** 引擎设置变更后调用（线程/内存即时生效） */
@@ -160,7 +192,7 @@ export class AnalysisController {
 
   /** 某个局面（走完一步之后）的评分文本；没算过返回空串 */
   scoreFor(fen: string): string {
-    const score = this.scores.get(fen);
+    const score = this.deepScores.get(fen) ?? this.autoScores.get(fen);
     if (!score) return '';
     return formatScore(score.cp, score.mate);
   }
@@ -197,6 +229,9 @@ export class AnalysisController {
   }
 
   private handleInfo(line: string): void {
+    // 最低分析时长：自动 0.2s、深度 0.5s，避免走子瞬间按旧先后手打分
+    const minMs = this.mode === 'deep' ? 500 : 200;
+    if (performance.now() - this.positionStart < minMs) return;
     if (line.includes('lowerbound') || line.includes('upperbound')) return;
     const parts = line.split(' ');
     const at = (key: string): string | undefined => {
@@ -222,7 +257,7 @@ export class AnalysisController {
     this.lines.set(multipv, { multipv, depth, cp, mate, pv });
 
     const best = this.lines.get(1);
-    if (best) this.scores.set(this.fen, { cp: best.cp, mate: best.mate });
+    if (best && this.mode === 'deep') this.deepScores.set(this.fen, { cp: best.cp, mate: best.mate });
 
     const now = performance.now();
     if (now - this.lastEmit < 100) return;
@@ -233,12 +268,19 @@ export class AnalysisController {
   private emit(): void {
     const sorted = [...this.lines.values()].sort((a, b) => a.multipv - b.multipv);
     const best = sorted[0];
-    this.onUpdate({
+    const snapshot: PositionAnalysis = {
       fen: this.fen,
       depth: best?.depth ?? 0,
       cp: best?.cp,
       mate: best?.mate,
       lines: sorted,
-    });
+    };
+    if (this.mode === 'deep') {
+      this.deepAnalyses.set(this.fen, snapshot);
+    } else if (this.recordAuto) {
+      this.autoAnalyses.set(this.fen, snapshot);
+      this.autoScores.set(this.fen, { cp: best?.cp, mate: best?.mate });
+    }
+    this.onUpdate(snapshot, this.mode);
   }
 }
